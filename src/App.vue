@@ -1,0 +1,142 @@
+<script setup>
+import { ref } from 'vue'
+import AppLayout from './components/layout/AppLayout.vue'
+import WelcomeSection from './components/ui/sections/WelcomeSection.vue'
+import AuditProgress from './components/ui/common/AuditProgress.vue'
+import PerformanceMetrics from './components/ui/sections/PerformanceMetrics.vue'
+import AuditResults from './components/ui/sections/AuditResults.vue'
+import { useLighthouseAudit } from './composables/useLighthouseAudit.js'
+
+const urlValue = ref('')
+const isDarkMode = ref(false)
+
+// Sidebar selections
+const currentDevice = ref('desktop')
+const currentThrottle = ref('none')
+const currentRuns = ref(1)
+const currentAuditView = ref('standard')
+
+// Use composable for audit logic
+const {
+  isRunning,
+  progress,
+  currentStage,
+  currentMessage,
+  auditError,
+  auditResults,
+  scores,
+  detailedMetrics,
+  opportunities,
+  diagnostics,
+  allRunsData,
+  runAudit
+} = useLighthouseAudit()
+
+// Event handlers
+const handleNavigationChange = (item) => {
+  console.log('Navigation changed to:', item.label)
+}
+
+const handleThemeChange = (isDark) => {
+  isDarkMode.value = isDark
+  console.log('Theme changed to:', isDark ? 'dark' : 'light')
+}
+
+const handleUrlChange = (url) => {
+  urlValue.value = url
+  console.log('URL changed to:', url)
+}
+
+const handleDeviceChange = (device) => {
+  currentDevice.value = device
+  console.log('Device changed to:', device)
+}
+
+const handleThrottleChange = (throttle) => {
+  currentThrottle.value = throttle.value
+  console.log('Throttle changed to:', throttle.value)
+}
+
+const handleRunsChange = (runs) => {
+  currentRuns.value = runs
+  console.log('Runs changed to:', runs)
+}
+
+const handleAuditViewChange = (auditView) => {
+  currentAuditView.value = auditView
+  console.log('Audit view changed to:', auditView)
+}
+
+const handleUrlSubmit = async (url) => {
+  if (!url) return
+
+  const auditConfig = {
+    url,
+    device: currentDevice.value,
+    throttle: currentThrottle.value,
+    runs: currentRuns.value,
+    auditView: currentAuditView.value
+  }
+
+  await runAudit(auditConfig)
+}
+</script>
+
+<template>
+  <AppLayout
+    header-title="Lighthouse Performance Tests"
+    logo-src="/vite.svg"
+    @navigation-change="handleNavigationChange"
+    @theme-change="handleThemeChange"
+    @device-change="handleDeviceChange"
+    @throttle-change="handleThrottleChange"
+    @runs-change="handleRunsChange"
+    @audit-view-change="handleAuditViewChange"
+  >
+    <div class="space-y-6">
+      <!-- Welcome Section -->
+      <WelcomeSection
+        :url="urlValue"
+        :is-dark-mode="isDarkMode"
+        :is-running="isRunning"
+        :current-device="currentDevice"
+        :current-throttle="currentThrottle"
+        :current-runs="currentRuns"
+        @url-change="handleUrlChange"
+        @submit="handleUrlSubmit"
+      />
+
+      <!-- Progress Section -->
+      <AuditProgress
+        :is-running="isRunning"
+        :audit-error="auditError"
+        :progress="progress"
+        :current-message="currentMessage"
+        :current-stage="currentStage"
+        :is-dark-mode="isDarkMode"
+      />
+
+      <!-- Performance Metrics -->
+      <PerformanceMetrics
+        v-if="auditResults"
+        :scores="scores"
+        :is-dark-mode="isDarkMode"
+      />
+
+      <!-- Audit Results -->
+      <AuditResults
+        v-if="auditResults"
+        :current-audit-view="currentAuditView"
+        :all-runs-data="allRunsData"
+        :current-device="currentDevice"
+        :current-throttle="currentThrottle"
+        :current-runs="currentRuns"
+        :audit-results="auditResults"
+        :detailed-metrics="detailedMetrics"
+        :opportunities="opportunities"
+        :diagnostics="diagnostics"
+        :is-dark-mode="isDarkMode"
+      />
+    </div>
+  </AppLayout>
+</template>

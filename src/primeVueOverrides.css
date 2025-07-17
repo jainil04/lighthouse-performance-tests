@@ -1,0 +1,88 @@
+/* Minimal PrimeVue overrides - only what Tailwind can't handle */
+.p-toggleswitch .p-toggleswitch-slider,
+.p-togglebutton-checked .p-togglebutton-content {
+  background-color: rgb(251 146 60) !important; /* orange-400 */
+}
+
+.p-togglebutton {
+  background: transparent !important;
+}
+
+.p-selectbutton .p-component {
+  border-color: rgb(251 146 60) !important; /* orange-400 */
+}
+
+.p-toggleswitch-handle {
+  background-color: #000000 !important; /* black */
+}
+
+.p-selectbutton .p-button.p-highlight {
+  background-color: rgb(251 146 60) !important; /* orange-400 */
+  border-color: rgb(251 146 60) !important;
+  color: #ffffff !important;
+}
+
+/* Select component overrides */
+.p-select:not(.p-disabled):hover {
+  border-color: rgb(251 146 60) !important; /* orange-400 */
+}
+
+.p-select:not(.p-disabled).p-focus {
+  outline: 0 none !important;
+  outline-offset: 0 !important;
+  box-shadow: 0 0 0 0.2rem rgba(251, 146, 60, 0.2) !important;
+  border-color: rgb(251 146 60) !important; /* orange-400 */
+}
+
+.p-select-option.p-highlight {
+  background-color: rgb(251 146 60) !important; /* orange-400 */
+  color: #ffffff !important;
+}
+
+.p-select-option:not(.p-highlight):not(.p-disabled).p-focus {
+  background-color: rgba(251, 146, 60, 0.12) !important;
+  color: rgb(251 146 60) !important; /* orange-400 */
+}
+
+/* Theme-specific component styling */
+.p-component-light {
+  --p-primary-color: rgb(251 146 60);
+  --p-primary-contrast-color: #ffffff;
+  --p-surface-0: #ffffff;
+  --p-surface-50: #f9fafb;
+  --p-surface-100: #f3f4f6;
+}
+
+.p-component-dark {
+  --p-primary-color: rgb(251 146 60);
+  --p-primary-contrast-color: #ffffff;
+  --p-surface-0: #1f2937;
+  --p-surface-50: #374151;
+  --p-surface-100: #4b5563;
+}
+
+/* Light theme specific */
+.p-component-light .p-select {
+  background-color: var(--p-surface-0);
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.p-component-light .p-selectbutton .p-button {
+  background-color: var(--p-surface-0);
+  border-color: #d1d5db;
+  color: #6b7280;
+}
+
+/* Dark theme specific */
+.p-component-dark .p-select {
+  background-color: var(--p-surface-0);
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+
+.p-component-dark .p-selectbutton .p-button {
+  background-color: var(--p-surface-0);
+  border-color: #4b5563;
+  color: #9ca3af;
+}
