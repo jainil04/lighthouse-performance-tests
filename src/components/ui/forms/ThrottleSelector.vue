@@ -1,11 +1,15 @@
 <script setup>
 import Select from 'primevue/select'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   isDarkMode: {
     type: Boolean,
     default: false
+  },
+  modelValue: {
+    type: String,
+    default: 'none'
   }
 })
 
@@ -17,7 +21,12 @@ const throttleOptions = ref([
   // { label: "3G", value: "3g" }
 ])
 
-const selectedThrottle = ref('none')
+const selectedThrottle = ref(props.modelValue)
+
+// Watch for prop changes
+watch(() => props.modelValue, (newValue) => {
+  selectedThrottle.value = newValue
+})
 
 const emit = defineEmits(['throttle-change'])
 

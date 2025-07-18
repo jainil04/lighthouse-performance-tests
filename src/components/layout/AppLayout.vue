@@ -19,6 +19,18 @@ const props = defineProps({
   currentRuns: {
     type: Number,
     default: 1
+  },
+  currentDevice: {
+    type: String,
+    default: 'desktop'
+  },
+  currentThrottle: {
+    type: String,
+    default: 'none'
+  },
+  currentAuditView: {
+    type: String,
+    default: 'standard'
   }
 })
 
@@ -56,16 +68,6 @@ onUnmounted(() => {
 const toggleSidebar = () => {
   sidebarOpen.value = !sidebarOpen.value
   console.log('Sidebar toggled:', sidebarOpen.value)
-}
-
-const handleItemClick = (item) => {
-  // Update active state
-  props.navigationItems.forEach(navItem => {
-    navItem.isActive = navItem.label === item.label
-  })
-
-  // Emit navigation change
-  emit('navigation-change', item)
 }
 
 const handleThemeChange = (isDark) => {
@@ -116,7 +118,9 @@ const handleCloseSidebar = () => {
         :is-open="sidebarOpen"
         :is-dark-mode="isDarkMode"
         :current-runs="currentRuns"
-        @item-click="handleItemClick"
+        :current-device="currentDevice"
+        :current-throttle="currentThrottle"
+        :current-audit-view="currentAuditView"
         @device-change="handleDeviceChange"
         @throttle-change="handleThrottleChange"
         @runs-change="handleRunsChange"

@@ -1,11 +1,15 @@
 <script setup>
 import SelectButton from 'primevue/selectbutton'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   isDarkMode: {
     type: Boolean,
     default: false
+  },
+  modelValue: {
+    type: String,
+    default: 'desktop'
   }
 })
 
@@ -14,7 +18,12 @@ const deviceOptions = ref([
   { value: 'mobile', icon: 'pi pi-mobile' }
 ])
 
-const selectedDevice = ref('desktop')
+const selectedDevice = ref(props.modelValue)
+
+// Watch for prop changes
+watch(() => props.modelValue, (newValue) => {
+  selectedDevice.value = newValue
+})
 
 const emit = defineEmits(['device-change'])
 

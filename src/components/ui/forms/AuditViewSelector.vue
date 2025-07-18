@@ -1,11 +1,15 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import SelectButton from 'primevue/selectbutton'
 
 const props = defineProps({
   isDarkMode: {
     type: Boolean,
     default: false
+  },
+  modelValue: {
+    type: String,
+    default: 'standard'
   }
 })
 
@@ -16,7 +20,12 @@ const auditViewOptions = ref([
   { label: 'Full', value: 'full' }
 ])
 
-const selectedAuditView = ref('standard')
+const selectedAuditView = ref(props.modelValue)
+
+// Watch for prop changes
+watch(() => props.modelValue, (newValue) => {
+  selectedAuditView.value = newValue
+})
 
 const handleAuditViewChange = () => {
   emit('audit-view-change', selectedAuditView.value)

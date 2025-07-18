@@ -4,7 +4,7 @@ import ThrottleSelector from '../ui/forms/ThrottleSelector.vue'
 import RunsSelector from '../ui/forms/RunsSelector.vue'
 import AuditViewSelector from '../ui/forms/AuditViewSelector.vue'
 import ThemeToggler from './ThemeToggler.vue'
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -22,6 +22,18 @@ const props = defineProps({
   currentRuns: {
     type: Number,
     default: 1
+  },
+  currentDevice: {
+    type: String,
+    default: 'desktop'
+  },
+  currentThrottle: {
+    type: String,
+    default: 'none'
+  },
+  currentAuditView: {
+    type: String,
+    default: 'standard'
   }
 })
 
@@ -44,9 +56,23 @@ const navigationItems = [
   },
 ]
 
+// Listen for audit start events to close sidebar on desktop
+const handleAuditStart = () => {
+  // Only close sidebar on desktop (lg breakpoint is 1024px)
+  if (window.innerWidth >= 1024) {
+    handleCloseSidebar()
+  }
+}
+
+// Set up event listener for audit start
+onMounted(() => {
+  window.addEventListener('audit-start', handleAuditStart)
+})
+
 // Clean up on unmount
 onUnmounted(() => {
   document.body.style.overflow = ''
+  window.removeEventListener('audit-start', handleAuditStart)
 })
 
 const emit = defineEmits(['device-change', 'throttle-change', 'runs-change', 'audit-view-change', 'close-sidebar', 'theme-change'])
@@ -202,11 +228,13 @@ const isActiveRoute = (path) => {
           <div class="space-y-4">
             <DeviceSelector
               :is-dark-mode="isDarkMode"
+              :model-value="currentDevice"
               @device-change="handleDeviceChange"
             />
 
             <ThrottleSelector
               :is-dark-mode="isDarkMode"
+              :model-value="currentThrottle"
               @throttle-change="handleThrottleChange"
             />
 
@@ -218,6 +246,7 @@ const isActiveRoute = (path) => {
 
             <AuditViewSelector
               :is-dark-mode="isDarkMode"
+              :model-value="currentAuditView"
               @audit-view-change="handleAuditViewChange"
             />
           </div>

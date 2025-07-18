@@ -175,6 +175,9 @@ export function useLighthouseAudit() {
 
     console.log('Starting Lighthouse audit:', auditConfig)
 
+    // Dispatch audit start event for sidebar to close on desktop
+    window.dispatchEvent(new CustomEvent('audit-start'))
+
     try {
       await streamLighthouseAudit(auditConfig, handleProgressUpdate)
     } catch (error) {

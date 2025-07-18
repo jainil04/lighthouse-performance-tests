@@ -8,11 +8,11 @@ import { useLighthouseAudit } from '../composables/useLighthouseAudit.js'
 
 const urlValue = ref('')
 
-// Sidebar selections
-const currentDevice = ref('desktop')
-const currentThrottle = ref('none')
+// Sidebar selections - use injected values from App.vue
+const currentDevice = inject('currentDevice', ref('desktop'))
+const currentThrottle = inject('currentThrottle', ref('none'))
 const currentRuns = inject('currentRuns', ref(1))
-const currentAuditView = ref('standard')
+const currentAuditView = inject('currentAuditView', ref('standard'))
 
 // Use composable for audit logic
 const {
@@ -34,26 +34,6 @@ const {
 const handleUrlChange = (url) => {
   urlValue.value = url
   console.log('URL changed to:', url)
-}
-
-const handleDeviceChange = (device) => {
-  currentDevice.value = device
-  console.log('Device changed to:', device)
-}
-
-const handleThrottleChange = (throttle) => {
-  currentThrottle.value = throttle
-  console.log('Throttle changed to:', throttle)
-}
-
-const handleRunsChange = (runs) => {
-  currentRuns.value = runs
-  console.log('Runs changed to:', runs)
-}
-
-const handleAuditViewChange = (view) => {
-  currentAuditView.value = view
-  console.log('Audit view changed to:', view)
 }
 
 const handleUrlSubmit = async () => {
@@ -81,14 +61,6 @@ const handleUrlSubmit = async () => {
 
 // Inject these values to child components
 const isDarkMode = inject('isDarkMode', ref(false))
-
-// Export handlers for parent AppLayout
-defineExpose({
-  handleDeviceChange,
-  handleThrottleChange,
-  handleRunsChange,
-  handleAuditViewChange
-})
 </script>
 
 <template>
