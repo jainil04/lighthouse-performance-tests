@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import './style.css'
 // import './themes/primeVueOverrides.css'
 import App from './App.vue'
+import router from './router'
 
 import PrimeVue from 'primevue/config';
 import Tooltip from 'primevue/tooltip'
@@ -93,5 +94,6 @@ app.use(PrimeVue, {
 });
 
 app.directive('tooltip', Tooltip)
+app.use(router)
 
 app.mount('#app')

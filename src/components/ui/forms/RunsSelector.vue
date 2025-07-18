@@ -6,6 +6,10 @@ const props = defineProps({
   isDarkMode: {
     type: Boolean,
     default: false
+  },
+  modelValue: {
+    type: Number,
+    default: 1
   }
 })
 
@@ -22,12 +26,15 @@ const runsOptions = ref([
   { label: "10 Runs", value: 10 }
 ])
 
-const selectedRuns = ref(1)
+const selectedRuns = ref(props.modelValue)
 
-const emit = defineEmits(['runs-change'])
+const emit = defineEmits(['runs-change', 'update:modelValue'])
 
 const handleRunsChange = (value) => {
+  selectedRuns.value = value
   emit('runs-change', value)
+  emit('update:modelValue', value)
+  console.log('RunsSelector: Emitting runs-change with value:', value)
 }
 </script>
 

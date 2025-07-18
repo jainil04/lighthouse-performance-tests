@@ -1,60 +1,36 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, provide, onMounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
-import WelcomeSection from './components/ui/sections/WelcomeSection.vue'
-import AuditProgress from './components/ui/common/AuditProgress.vue'
-import PerformanceMetrics from './components/ui/sections/PerformanceMetrics.vue'
-import AuditResults from './components/ui/sections/AuditResults.vue'
-import { useLighthouseAudit } from './composables/useLighthouseAudit.js'
 
-const urlValue = ref('')
+// Dark mode state - provide to all children
 const isDarkMode = ref(false)
 
-// Sidebar selections
-const currentDevice = ref('desktop')
-const currentThrottle = ref('none')
+// Sidebar selection state
 const currentRuns = ref(1)
-const currentAuditView = ref('standard')
 
-// Use composable for audit logic
-const {
-  isRunning,
-  progress,
-  currentStage,
-  currentMessage,
-  auditError,
-  auditResults,
-  scores,
-  detailedMetrics,
-  opportunities,
-  diagnostics,
-  allRunsData,
-  runAudit
-} = useLighthouseAudit()
+// Clean up any existing theme classes on mount
+onMounted(() => {
+  // Remove any existing theme classes that might be causing conflicts
+  document.documentElement.classList.remove('my-app-dark', 'dark')
+})
 
-// Event handlers
-const handleNavigationChange = (item) => {
-  console.log('Navigation changed to:', item.label)
+const toggleDarkMode = () => {
+  isDarkMode.value = !isDarkMode.value
 }
 
-const handleThemeChange = (isDark) => {
-  isDarkMode.value = isDark
-  console.log('Theme changed to:', isDark ? 'dark' : 'light')
-}
+// Provide dark mode to all components
+provide('isDarkMode', isDarkMode)
+provide('toggleDarkMode', toggleDarkMode)
+provide('currentRuns', currentRuns)
 
-const handleUrlChange = (url) => {
-  urlValue.value = url
-  console.log('URL changed to:', url)
-}
-
+// Sidebar selection handlers for AppLayout
 const handleDeviceChange = (device) => {
-  currentDevice.value = device
+  // This will be handled by the individual views now
   console.log('Device changed to:', device)
 }
 
 const handleThrottleChange = (throttle) => {
-  currentThrottle.value = throttle.value
-  console.log('Throttle changed to:', throttle.value)
+  console.log('Throttle changed to:', throttle)
 }
 
 const handleRunsChange = (runs) => {
@@ -62,81 +38,46 @@ const handleRunsChange = (runs) => {
   console.log('Runs changed to:', runs)
 }
 
-const handleAuditViewChange = (auditView) => {
-  currentAuditView.value = auditView
-  console.log('Audit view changed to:', auditView)
+const handleAuditViewChange = (view) => {
+  console.log('Audit view changed to:', view)
 }
 
-const handleUrlSubmit = async (url) => {
-  if (!url) return
+const handleThemeChange = (isDark) => {
+  isDarkMode.value = isDark
+  console.log('Theme changed to:', isDark)
 
-  const auditConfig = {
-    url,
-    device: currentDevice.value,
-    throttle: currentThrottle.value,
-    runs: currentRuns.value,
-    auditView: currentAuditView.value
+  // Apply theme class to document element for global theme support
+  if (isDark) {
+    document.documentElement.classList.add('dark')
+  } else {
+    document.documentElement.classList.remove('dark')
   }
-
-  await runAudit(auditConfig)
 }
 </script>
 
 <template>
-  <AppLayout
-    header-title="Lighthouse Performance Tests"
-    logo-src="/vite.svg"
-    @navigation-change="handleNavigationChange"
-    @theme-change="handleThemeChange"
-    @device-change="handleDeviceChange"
-    @throttle-change="handleThrottleChange"
-    @runs-change="handleRunsChange"
-    @audit-view-change="handleAuditViewChange"
-  >
-    <div class="space-y-6">
-      <!-- Welcome Section -->
-      <WelcomeSection
-        :url="urlValue"
-        :is-dark-mode="isDarkMode"
-        :is-running="isRunning"
-        :current-device="currentDevice"
-        :current-throttle="currentThrottle"
-        :current-runs="currentRuns"
-        @url-change="handleUrlChange"
-        @submit="handleUrlSubmit"
-      />
-
-      <!-- Progress Section -->
-      <AuditProgress
-        :is-running="isRunning"
-        :audit-error="auditError"
-        :progress="progress"
-        :current-message="currentMessage"
-        :current-stage="currentStage"
-        :is-dark-mode="isDarkMode"
-      />
-
-      <!-- Performance Metrics -->
-      <PerformanceMetrics
-        v-if="auditResults"
-        :scores="scores"
-        :is-dark-mode="isDarkMode"
-      />
-
-      <!-- Audit Results -->
-      <AuditResults
-        v-if="auditResults"
-        :current-audit-view="currentAuditView"
-        :all-runs-data="allRunsData"
-        :current-device="currentDevice"
-        :current-throttle="currentThrottle"
-        :current-runs="currentRuns"
-        :audit-results="auditResults"
-        :detailed-metrics="detailedMetrics"
-        :opportunities="opportunities"
-        :diagnostics="diagnostics"
-        :is-dark-mode="isDarkMode"
-      />
-    </div>
-  </AppLayout>
+  <div id="app" :class="{ 'dark': isDarkMode }">
+    <AppLayout
+      :is-dark-mode="isDarkMode"
+      :current-runs="currentRuns"
+      @theme-change="handleThemeChange"
+      @device-change="handleDeviceChange"
+      @throttle-change="handleThrottleChange"
+      @runs-change="handleRunsChange"
+      @audit-view-change="handleAuditViewChange"
+    >
+      <RouterView />
+    </AppLayout>
+  </div>
 </template>
+
+<style scoped>
+#app {
+  min-height: 100vh;
+  transition: all 0.3s ease;
+}
+
+.dark {
+  background-color: #1e1e1e;
+}
+</style>

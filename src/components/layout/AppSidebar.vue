@@ -13,6 +13,10 @@ const props = defineProps({
   isDarkMode: {
     type: Boolean,
     default: false
+  },
+  currentRuns: {
+    type: Number,
+    default: 1
   }
 })
 
@@ -75,6 +79,7 @@ const handleAuditViewChange = (value) => {
 
         <RunsSelector
           :is-dark-mode="isDarkMode"
+          :model-value="currentRuns"
           @runs-change="handleRunsChange"
         />
 

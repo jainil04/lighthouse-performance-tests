@@ -12,12 +12,19 @@ const props = defineProps({
     type: String,
     default: '/vite.svg'
   },
+  isDarkMode: {
+    type: Boolean,
+    default: false
+  },
+  currentRuns: {
+    type: Number,
+    default: 1
+  }
 })
 
 const emit = defineEmits(['navigation-change', 'theme-change', 'device-change', 'throttle-change', 'runs-change', 'audit-view-change'])
 
 const sidebarOpen = ref(true)
-const isDarkMode = ref(false)
 
 const toggleSidebar = () => {
   sidebarOpen.value = !sidebarOpen.value
@@ -35,15 +42,8 @@ const handleItemClick = (item) => {
 }
 
 const handleThemeChange = (isDark) => {
-  isDarkMode.value = isDark
+  console.log('Theme change event received:', isDark)
   emit('theme-change', isDark)
-
-  // Apply theme class to document
-  if (isDark) {
-    document.documentElement.classList.add('dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-  }
 }
 
 const handleDeviceChange = (device) => {
@@ -83,6 +83,7 @@ const handleAuditViewChange = (auditView) => {
       <AppSidebar
         :is-open="sidebarOpen"
         :is-dark-mode="isDarkMode"
+        :current-runs="currentRuns"
         @item-click="handleItemClick"
         @device-change="handleDeviceChange"
         @throttle-change="handleThrottleChange"

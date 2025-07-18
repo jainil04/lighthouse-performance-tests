@@ -1,6 +1,12 @@
 <script setup>
+import { ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import ThemeToggler from './ThemeToggler.vue'
 import Button from 'primevue/button'
+import Menubar from 'primevue/menubar'
+
+const router = useRouter()
+const route = useRoute()
 
 defineProps({
   logoSrc: {
@@ -22,6 +28,23 @@ defineProps({
 })
 
 defineEmits(['toggle-sidebar', 'theme-change'])
+
+const menuItems = ref([
+  {
+    label: 'Home',
+    icon: 'pi pi-home',
+    command: () => {
+      router.push('/')
+    }
+  },
+  {
+    label: 'Compare Results',
+    icon: 'pi pi-upload',
+    command: () => {
+      router.push('/upload')
+    }
+  }
+])
 </script>
 
 <template>
@@ -38,6 +61,17 @@ defineEmits(['toggle-sidebar', 'theme-change'])
       />
       <img :src="logoSrc" :alt="logoAlt" class="w-8 h-8">
       <span v-if="title" :class="['text-lg font-medium', isDarkMode ? 'text-white' : 'text-gray-900']">{{ title }}</span>
+    </div>
+
+    <!-- Center - Navigation Menubar -->
+    <div class="hidden md:block">
+      <Menubar
+        :model="menuItems"
+        :class="[
+          'border-0 bg-transparent p-0',
+          isDarkMode ? 'text-white' : 'text-gray-900'
+        ]"
+      />
     </div>
 
     <!-- Right side - Theme toggler -->
