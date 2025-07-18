@@ -82,7 +82,7 @@ const menuItems = ref([
     </div>
 
     <!-- Right side - Theme toggler -->
-    <div class="flex items-center">
+    <div class="hidden md:flex items-center">
       <ThemeToggler
         :is-dark="isDarkMode"
         @theme-change="$emit('theme-change', $event)"

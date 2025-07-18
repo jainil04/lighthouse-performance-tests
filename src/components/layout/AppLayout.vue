@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 
@@ -24,7 +24,34 @@ const props = defineProps({
 
 const emit = defineEmits(['navigation-change', 'theme-change', 'device-change', 'throttle-change', 'runs-change', 'audit-view-change'])
 
-const sidebarOpen = ref(true)
+// Responsive sidebar state
+const sidebarOpen = ref(false)
+
+// Check if we're on desktop
+const isDesktop = () => window.innerWidth >= 1024
+
+// Initialize sidebar state based on screen size
+const initializeSidebar = () => {
+  sidebarOpen.value = isDesktop()
+}
+
+// Handle window resize
+const handleResize = () => {
+  if (isDesktop()) {
+    sidebarOpen.value = true
+  } else {
+    sidebarOpen.value = false
+  }
+}
+
+onMounted(() => {
+  initializeSidebar()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 const toggleSidebar = () => {
   sidebarOpen.value = !sidebarOpen.value
@@ -65,6 +92,11 @@ const handleAuditViewChange = (auditView) => {
   console.log('Audit view changed to:', auditView)
   emit('audit-view-change', auditView)
 }
+
+const handleCloseSidebar = () => {
+  sidebarOpen.value = false
+  console.log('Sidebar closed')
+}
 </script>
 
 <template>
@@ -78,7 +110,7 @@ const handleAuditViewChange = (auditView) => {
       @theme-change="handleThemeChange"
     />
 
-    <div class="flex w-full">
+    <div class="flex w-full relative">
       <!-- Sidebar -->
       <AppSidebar
         :is-open="sidebarOpen"
@@ -89,13 +121,16 @@ const handleAuditViewChange = (auditView) => {
         @throttle-change="handleThrottleChange"
         @runs-change="handleRunsChange"
         @audit-view-change="handleAuditViewChange"
+        @close-sidebar="handleCloseSidebar"
+        @theme-change="handleThemeChange"
       />
 
       <!-- Main Content Area -->
       <main
         :class="[
           'flex-1 w-full transition-all duration-300 ease-in-out',
-          sidebarOpen ? 'ml-0' : 'ml-0'
+          'lg:ml-0',
+          sidebarOpen ? 'lg:ml-0' : 'lg:ml-0'
         ]"
       >
         <div class="p-6 w-full">
