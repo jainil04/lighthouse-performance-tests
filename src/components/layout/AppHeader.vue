@@ -43,7 +43,14 @@ const menuItems = ref([
     command: () => {
       router.push('/upload')
     }
-  }
+  },
+  {
+    label: 'Documentation',
+    icon: 'pi pi-book',
+    command: () => {
+      router.push('/documentation')
+    }
+  },
 ])
 </script>
 
