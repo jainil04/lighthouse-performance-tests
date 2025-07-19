@@ -106,6 +106,13 @@
 import ProgressBar from 'primevue/progressbar'
 import { ref, watch, onMounted, nextTick } from 'vue'
 import { gsap } from 'gsap'
+import {
+  animateSlideDownEntry,
+  animateSlideUpExit,
+  animateCascade,
+  animateIconEntry,
+  animateSpinner
+} from '../../../utils/animationUtils'
 
 const props = defineProps({
   isRunning: Boolean,
@@ -141,120 +148,104 @@ const successStatus = ref(null)
 const successIcon = ref(null)
 const successMessage = ref(null)
 
-// Animation functions
+// Animation functions using utilities
 const animateContainerEntry = () => {
-  if (progressContainer.value) {
-    // Set initial position: dragged down from top
-    gsap.set(progressContainer.value, {
-      y: -100,
-      opacity: 0,
-      scale: 0.9
-    })
-
-    // Animate down with bounce effect
-    gsap.to(progressContainer.value, {
-      y: 0,
-      opacity: 1,
-      scale: 1,
-      duration: 0.8,
-      ease: "back.out(1.4)",
-      clearProps: "transform"
-    })
-  }
+  animateSlideDownEntry(progressContainer.value)
 }
 
 const animateContainerExit = () => {
-  if (progressContainer.value) {
-    return gsap.to(progressContainer.value, {
-      y: -100,
-      opacity: 0,
-      scale: 0.9,
-      duration: 0.6,
-      ease: "back.in(1.4)",
-      onComplete: () => {
-        // Hide the component from DOM after animation completes
-        shouldShowComponent.value = false
-      }
-    })
-  }
-  return Promise.resolve()
+  return animateSlideUpExit(progressContainer.value, {
+    onComplete: () => {
+      shouldShowComponent.value = false
+    }
+  })
 }
 
 const animateErrorState = () => {
-  if (errorState.value) {
-    const tl = gsap.timeline()
+  const elements = [
+    {
+      element: errorTitle.value,
+      from: { opacity: 0, y: 20 },
+      to: { opacity: 1, y: 0 }
+    },
+    {
+      element: errorMessage.value,
+      from: { opacity: 0, y: 15 },
+      to: { opacity: 1, y: 0 }
+    }
+  ].filter(item => item.element)
 
-    tl.fromTo(errorIcon.value,
-      { scale: 0, rotation: -180 },
-      { scale: 1, rotation: 0, duration: 0.6, ease: "back.out(1.7)" }
-    )
-    .fromTo(errorTitle.value,
-      { opacity: 0, y: 20 },
-      { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" },
-      "-=0.2"
-    )
-    .fromTo(errorMessage.value,
-      { opacity: 0, y: 15 },
-      { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" },
-      "-=0.2"
-    )
+  // Animate icon separately
+  if (errorIcon.value) {
+    animateIconEntry(errorIcon.value)
+  }
+
+  // Animate other elements in cascade
+  if (elements.length > 0) {
+    animateCascade(elements)
   }
 }
 
 const animateRunningState = () => {
-  if (runningState.value) {
-    const tl = gsap.timeline()
-
-    tl.fromTo(runningHeader.value,
-      { opacity: 0, y: -20 },
-      { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }
-    )
-    .fromTo(progressBarContainer.value,
-      { opacity: 0, scaleX: 0.8 },
-      { opacity: 1, scaleX: 1, duration: 0.5, ease: "power2.out" },
-      "-=0.2"
-    )
-    .fromTo(statusContainer.value,
-      { opacity: 0, y: 20 },
-      { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" },
-      "-=0.2"
-    )
-
-    // Animate spinner with continuous rotation
-    if (spinnerIcon.value) {
-      gsap.to(spinnerIcon.value, {
-        rotation: 360,
-        duration: 1,
-        repeat: -1,
-        ease: "none"
-      })
+  const elements = [
+    {
+      element: runningHeader.value,
+      from: { opacity: 0, y: -20 },
+      to: { opacity: 1, y: 0 }
+    },
+    {
+      element: progressBarContainer.value,
+      from: { opacity: 0, scaleX: 0.8 },
+      to: { opacity: 1, scaleX: 1 },
+      duration: 0.5
+    },
+    {
+      element: statusContainer.value,
+      from: { opacity: 0, y: 20 },
+      to: { opacity: 1, y: 0 }
     }
+  ].filter(item => item.element)
+
+  if (elements.length > 0) {
+    animateCascade(elements)
+  }
+
+  // Start continuous spinner animation
+  if (spinnerIcon.value) {
+    animateSpinner(spinnerIcon.value)
   }
 }
 
 const animateCompletedState = () => {
-  if (completedState.value) {
-    const tl = gsap.timeline()
+  const elements = [
+    {
+      element: completedHeader.value,
+      from: { opacity: 0, y: -20 },
+      to: { opacity: 1, y: 0 }
+    },
+    {
+      element: completedBarContainer.value,
+      from: { opacity: 0, scaleX: 0.8 },
+      to: { opacity: 1, scaleX: 1 },
+      duration: 0.5
+    },
+    {
+      element: successMessage.value,
+      from: { opacity: 0, x: 20 },
+      to: { opacity: 1, x: 0 }
+    }
+  ].filter(item => item.element)
 
-    tl.fromTo(completedHeader.value,
-      { opacity: 0, y: -20 },
-      { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }
-    )
-    .fromTo(completedBarContainer.value,
-      { opacity: 0, scaleX: 0.8 },
-      { opacity: 1, scaleX: 1, duration: 0.5, ease: "power2.out" },
-      "-=0.2"
-    )
-    .fromTo(successIcon.value,
-      { scale: 0, rotation: -180 },
-      { scale: 1, rotation: 0, duration: 0.6, ease: "back.out(1.7)" },
-      "-=0.1"
-    )
-    .fromTo(successMessage.value,
-      { opacity: 0, x: 20 },
-      { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" },
-      "-=0.3"
-    )
+  // Animate success icon separately
+  if (successIcon.value) {
+    setTimeout(() => {
+      animateIconEntry(successIcon.value)
+    }, 100)
+  }
+
+  // Animate other elements in cascade
+  if (elements.length > 0) {
+    animateCascade(elements)
   }
 }
 
