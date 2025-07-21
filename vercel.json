@@ -1,9 +1,7 @@
 {
   "functions": {
     "api/**/*.js": {
-      "includeFiles": [
-        "node_modules/lighthouse/shared/localization/locales/**"
-      ]
+      "includeFiles": "node_modules/lighthouse/shared/localization/locales/**"
     }
   }
 }
