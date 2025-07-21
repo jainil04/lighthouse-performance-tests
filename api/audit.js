@@ -1,6 +1,10 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
 
+// Force English locale to prevent missing locale file errors
+process.env.LC_ALL = 'en_US.UTF-8';
+process.env.LANG = 'en_US.UTF-8';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({
@@ -31,11 +35,16 @@ export default async function handler(req, res) {
     if (isProduction) {
       const chromium = await import('@sparticuz/chromium');
       launchConfig = {
-        args: chromium.default.args,
+        args: [
+          ...chromium.default.args,
+          '--lang=en-US',
+          '--accept-lang=en-US'
+        ],
         executablePath: await chromium.default.executablePath(),
         headless: chromium.default.headless,
         ignoreHTTPSErrors: true,
-        timeout: 30000
+        timeout: 30000,
+        locale: 'en-US'
       };
     } else {
       // Find local Chrome installation
