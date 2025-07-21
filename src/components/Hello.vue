@@ -84,30 +84,30 @@
       <li v-for="p in products" :key="p.id">{{ p.name }}</li>
     </ul>
 
-    <div v-if="healthData" style="margin-top: 20px; padding: 10px; background: #f0f9ff; border-radius: 4px;">
-      <h4>Health Check Result:</h4>
-      <pre>{{ JSON.stringify(healthData, null, 2) }}</pre>
+    <div v-if="healthData" style="margin-top: 20px; padding: 10px; background: #f0f9ff; border-radius: 4px; color: #1e40af;">
+      <h4 style="color: #1e40af; margin-bottom: 10px;">Health Check Result:</h4>
+      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(healthData, null, 2) }}</pre>
     </div>
 
-    <div v-if="statusData" style="margin-top: 20px; padding: 10px; background: #fff7ed; border-radius: 4px;">
-      <h4>Status Check Result:</h4>
-      <pre>{{ JSON.stringify(statusData, null, 2) }}</pre>
+    <div v-if="statusData" style="margin-top: 20px; padding: 10px; background: #fff7ed; border-radius: 4px; color: #c2410c;">
+      <h4 style="color: #c2410c; margin-bottom: 10px;">Status Check Result:</h4>
+      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(statusData, null, 2) }}</pre>
     </div>
 
-    <div v-if="debugData" style="margin-top: 20px; padding: 10px; background: #fef3c7; border-radius: 4px;">
-      <h4>Debug Check Result:</h4>
-      <pre>{{ JSON.stringify(debugData, null, 2) }}</pre>
+    <div v-if="debugData" style="margin-top: 20px; padding: 10px; background: #fef3c7; border-radius: 4px; color: #d97706;">
+      <h4 style="color: #d97706; margin-bottom: 10px;">Debug Check Result:</h4>
+      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(debugData, null, 2) }}</pre>
     </div>
 
-    <div v-if="chromeData" style="margin-top: 20px; padding: 10px; background: #f3f4f6; border-radius: 4px;">
-      <h4>Chrome Test Result:</h4>
-      <pre>{{ JSON.stringify(chromeData, null, 2) }}</pre>
+    <div v-if="chromeData" style="margin-top: 20px; padding: 10px; background: #f3f4f6; border-radius: 4px; color: #374151;">
+      <h4 style="color: #374151; margin-bottom: 10px;">Chrome Test Result:</h4>
+      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(chromeData, null, 2) }}</pre>
     </div>
   </div>
   <!-- Add this to your results section -->
-    <div v-if="auditData" style="margin-top: 20px; padding: 10px; background: #ecfdf5; border-radius: 4px;">
-      <h4>Lighthouse Audit Result:</h4>
-      <div v-if="auditData.success" style="margin-bottom: 10px;">
+    <div v-if="auditData" style="margin-top: 20px; padding: 10px; background: #ecfdf5; border-radius: 4px; color: #065f46;">
+      <h4 style="color: #065f46; margin-bottom: 10px;">Lighthouse Audit Result:</h4>
+      <div v-if="auditData.success" style="margin-bottom: 10px; color: #065f46;">
         <strong>URL:</strong> {{ auditData.url }}<br>
         <strong>Scores:</strong>
         Performance: {{ auditData.scores?.performance }},
@@ -115,14 +115,14 @@
         Best Practices: {{ auditData.scores?.bestPractices }},
         SEO: {{ auditData.scores?.seo }}
       </div>
-      <pre>{{ JSON.stringify(auditData, null, 2) }}</pre>
+      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(auditData, null, 2) }}</pre>
     </div>
-    <div v-if="streamingData" style="margin-top: 20px; padding: 10px; background: #fdf4ff; border-radius: 4px;">
-      <h4>Streaming Lighthouse Audit:</h4>
-      <div v-if="streamingProgress" style="margin-bottom: 10px;">
+    <div v-if="streamingData" style="margin-top: 20px; padding: 10px; background: #fdf4ff; border-radius: 4px; color: #7c2d92;">
+      <h4 style="color: #7c2d92; margin-bottom: 10px;">Streaming Lighthouse Audit:</h4>
+      <div v-if="streamingProgress" style="margin-bottom: 10px; color: #7c2d92;">
         <strong>Progress:</strong> {{ streamingProgress.message }} ({{ streamingProgress.progress }}%)
       </div>
-      <div v-if="streamingData.success" style="margin-bottom: 10px;">
+      <div v-if="streamingData.success" style="margin-bottom: 10px; color: #7c2d92;">
         <strong>URL:</strong> {{ streamingData.url }}<br>
         <strong>Scores:</strong>
         Performance: {{ streamingData.scores?.performance }},
@@ -130,7 +130,7 @@
         Best Practices: {{ streamingData.scores?.bestPractices }},
         SEO: {{ streamingData.scores?.seo }}
       </div>
-      <pre>{{ JSON.stringify(streamingData, null, 2) }}</pre>
+      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(streamingData, null, 2) }}</pre>
     </div>
 </template>
 
