@@ -4,6 +4,8 @@ import puppeteer from 'puppeteer-core';
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
 process.env.LANG = 'en_US.UTF-8';
+process.env.LANGUAGE = 'en_US';
+process.env.LIGHTHOUSE_LOCALE = 'en-US';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -147,11 +149,12 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString()
     });
 
-    // Lighthouse configuration
+    // Lighthouse configuration with aggressive locale forcing
     const lighthouseConfig = {
       extends: 'lighthouse:default',
       settings: {
         locale: 'en-US',
+        locales: ['en-US'], // Force only English locale
         onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
         formFactor: device === 'mobile' ? 'mobile' : 'desktop',
         screenEmulation: device === 'mobile' ? {
@@ -180,7 +183,10 @@ export default async function handler(req, res) {
           'screenshot-thumbnails',
           'final-screenshot',
           'largest-contentful-paint-element',
-          'layout-shift-elements'
+          'layout-shift-elements',
+          // Skip more audits that might load locale files
+          'full-page-screenshot',
+          'mainthread-work-breakdown'
         ]
       }
     };
@@ -197,7 +203,8 @@ export default async function handler(req, res) {
     const lighthouseOptions = {
       port: new URL(wsEndpoint).port,
       output: 'json',
-      logLevel: 'info'
+      logLevel: 'error', // Reduce logging to avoid locale-related logs
+      locale: 'en-US' // Force locale in options too
     };
 
     // Simulate progress during audit (since Lighthouse doesn't provide real-time progress)
@@ -211,7 +218,8 @@ export default async function handler(req, res) {
       });
     }, 2000);
 
-    const { lhr } = await lighthouse(url, lighthouseOptions, lighthouseConfig);
+    // Use minimal config or null to avoid config-related locale loading
+    const { lhr } = await lighthouse(url, lighthouseOptions, null);
 
     clearInterval(progressInterval);
 
