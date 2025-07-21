@@ -16,7 +16,7 @@ export async function streamLighthouseAudit(auditConfig, onProgress) {
   try {
     console.log('Starting streaming audit with config:', auditConfig);
 
-    const response = await fetch(`${API_BASE_URL}/api/lighthouse/audit/stream`, {
+    const response = await fetch("/api/lighthouse", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
