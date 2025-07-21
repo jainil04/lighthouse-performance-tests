@@ -27,6 +27,7 @@
         @submit="handleSubmit"
       />
     </div>
+    <Hello :is-dark-mode="isDarkMode"/>
 
     <!-- Selection Summary -->
     <div class="mt-4">
@@ -43,6 +44,7 @@
 <script setup>
 import UrlInput from '../forms/UrlInput.vue'
 import SelectionSummary from '../common/SelectionSummary.vue'
+import Hello from '../../Hello.vue'
 
 defineProps({
   url: String,
