@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@primeuix/themes": "^1.2.1",
+    "@sparticuz/chromium": "^138.0.2",
     "@sparticuz/chromium-min": "^119.0.0",
     "@tailwindcss/vite": "^4.1.11",
     "gsap": "^3.13.0",

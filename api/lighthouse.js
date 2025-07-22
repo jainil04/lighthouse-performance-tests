@@ -1,5 +1,6 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
+import fs from 'fs';
 
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
@@ -66,9 +67,9 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       });
 
-      // --- Setup for chromium-min ---
-      // Import chromium-min
-      const chromium = await import('@sparticuz/chromium-min');
+      // --- Setup for chromium ---
+      // Import regular chromium package for better compatibility
+      const chromium = await import('@sparticuz/chromium');
 
       launchConfig = {
         args: [
