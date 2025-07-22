@@ -20,7 +20,12 @@ export default async function handler(req, res) {
       // Production/Vercel configuration
       const chromium = await import('@sparticuz/chromium');
       launchConfig = {
-        args: chromium.default.args,
+        args: [
+          ...chromium.default.args,
+          '--hide-scrollbars',
+          '--disable-web-security'
+        ],
+        defaultViewport: chromium.default.defaultViewport,
         executablePath: await chromium.default.executablePath(),
         headless: chromium.default.headless,
         ignoreHTTPSErrors: true,

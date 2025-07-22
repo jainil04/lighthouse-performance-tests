@@ -71,8 +71,11 @@ export default async function handler(req, res) {
         args: [
           ...chromium.default.args,
           '--lang=en-US',
-          '--accept-lang=en-US'
+          '--accept-lang=en-US',
+          '--hide-scrollbars',
+          '--disable-web-security'
         ],
+        defaultViewport: chromium.default.defaultViewport,
         executablePath: await chromium.default.executablePath(),
         headless: chromium.default.headless,
         ignoreHTTPSErrors: true,
