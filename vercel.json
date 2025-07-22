@@ -1,7 +1,70 @@
 {
+  "version": 2,
+  "buildCommand": "npm run build:production",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
   "functions": {
-    "api/**/*.js": {
-      "includeFiles": "node_modules/lighthouse/shared/localization/locales/**"
+    "api/lighthouse.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/audit.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/status.js": {
+      "maxDuration": 10,
+      "memory": 128
+    },
+    "api/health.js": {
+      "maxDuration": 10,
+      "memory": 128
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/lighthouse/audit/stream",
+      "destination": "/api/lighthouse"
+    },
+    {
+      "source": "/api/lighthouse/audit",
+      "destination": "/api/audit"
+    },
+    {
+      "source": "/api/lighthouse/status",
+      "destination": "/api/status"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/health"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ]
 }
