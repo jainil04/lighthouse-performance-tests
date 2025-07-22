@@ -1,47 +1,35 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "functions": {
-    "api/lighthouse.js": {
-      "maxDuration": 60,
-      "memory": 1024
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 60,
+        "memory": 1024
+      }
     },
-    "api/audit.js": {
-      "maxDuration": 60,
-      "memory": 1024
-    },
-    "api/test-chrome.js": {
-      "maxDuration": 30,
-      "memory": 512
-    },
-    "api/debug.js": {
-      "maxDuration": 15,
-      "memory": 256
-    },
-    "api/status.js": {
-      "maxDuration": 10,
-      "memory": 256
-    },
-    "api/health.js": {
-      "maxDuration": 10,
-      "memory": 128
-    },
-    "api/hello.js": {
-      "maxDuration": 10,
-      "memory": 128
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
-  },
+  ],
+  "routes": [
+    {
+      "src": "/api/lighthouse/audit/stream",
+      "dest": "/api/lighthouse.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1.js"
+    }
+  ],
   "env": {
     "LIGHTHOUSE_LOCALE": "en-US",
     "LC_ALL": "C",
     "LANG": "en_US.UTF-8"
-  },
-  "rewrites": [
-    {
-      "source": "/api/lighthouse/audit/stream",
-      "destination": "/api/lighthouse"
-    }
-  ]
+  }
 }
