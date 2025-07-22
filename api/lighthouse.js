@@ -149,13 +149,13 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString()
     });
 
-    // Lighthouse configuration with aggressive locale forcing
+    // Lighthouse configuration - exclude accessibility to avoid axe-core dependency
     const lighthouseConfig = {
       extends: 'lighthouse:default',
       settings: {
         locale: 'en-US',
         locales: ['en-US'], // Force only English locale
-        onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
+        onlyCategories: ['performance', 'best-practices', 'seo'], // Remove accessibility
         formFactor: device === 'mobile' ? 'mobile' : 'desktop',
         screenEmulation: device === 'mobile' ? {
           mobile: true,
@@ -184,9 +184,47 @@ export default async function handler(req, res) {
           'final-screenshot',
           'largest-contentful-paint-element',
           'layout-shift-elements',
-          // Skip more audits that might load locale files
           'full-page-screenshot',
-          'mainthread-work-breakdown'
+          'mainthread-work-breakdown',
+          // Skip all accessibility audits to avoid axe-core dependency
+          'accesskeys',
+          'aria-allowed-attr',
+          'aria-hidden-body',
+          'aria-hidden-focus',
+          'aria-input-field-name',
+          'aria-required-attr',
+          'aria-required-children',
+          'aria-required-parent',
+          'aria-roles',
+          'aria-toggle-field-name',
+          'aria-valid-attr',
+          'aria-valid-attr-value',
+          'button-name',
+          'bypass',
+          'color-contrast',
+          'definition-list',
+          'dlitem',
+          'document-title',
+          'duplicate-id-active',
+          'duplicate-id-aria',
+          'form-field-multiple-labels',
+          'frame-title',
+          'heading-order',
+          'html-has-lang',
+          'html-lang-valid',
+          'image-alt',
+          'input-image-alt',
+          'label',
+          'link-name',
+          'list',
+          'listitem',
+          'meta-refresh',
+          'meta-viewport',
+          'object-alt',
+          'tabindex',
+          'td-headers-attr',
+          'th-has-data-cells',
+          'valid-lang'
         ]
       }
     };
