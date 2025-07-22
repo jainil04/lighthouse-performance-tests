@@ -5,66 +5,43 @@
   "installCommand": "npm install",
   "functions": {
     "api/lighthouse.js": {
-      "maxDuration": 30,
+      "maxDuration": 60,
       "memory": 1024
     },
     "api/audit.js": {
-      "maxDuration": 30,
+      "maxDuration": 60,
       "memory": 1024
+    },
+    "api/test-chrome.js": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "api/debug.js": {
+      "maxDuration": 15,
+      "memory": 256
     },
     "api/status.js": {
       "maxDuration": 10,
-      "memory": 128
+      "memory": 256
     },
     "api/health.js": {
       "maxDuration": 10,
       "memory": 128
+    },
+    "api/hello.js": {
+      "maxDuration": 10,
+      "memory": 128
     }
+  },
+  "env": {
+    "LIGHTHOUSE_LOCALE": "en-US",
+    "LC_ALL": "C",
+    "LANG": "en_US.UTF-8"
   },
   "rewrites": [
     {
       "source": "/api/lighthouse/audit/stream",
       "destination": "/api/lighthouse"
-    },
-    {
-      "source": "/api/lighthouse/audit",
-      "destination": "/api/audit"
-    },
-    {
-      "source": "/api/lighthouse/status",
-      "destination": "/api/status"
-    },
-    {
-      "source": "/health",
-      "destination": "/api/health"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
     }
   ]
 }
