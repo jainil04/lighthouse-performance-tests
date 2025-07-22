@@ -44,6 +44,23 @@ export default async function handler(req, res) {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 
+  // --- 0) Prepare the font archive for chromium-min ---
+  const packDir = '/tmp/chromium-pack';
+  // ensure the directory exists
+  fs.mkdirSync(packDir, { recursive: true });
+
+  // copy the vendored fonts.tar.br into place
+  const vendored = path.join(__dirname, '../assets/fonts.tar.br');
+  const destFonts = path.join(packDir, 'fonts.tar.br');
+  fs.copyFileSync(vendored, destFonts);
+
+  // --- 1) Decompress both the fonts and the chromium binary ---
+  await decompressAssets({
+    cacheDir: packDir,
+    assets:   ['fonts', 'chromium']
+  });
+
+
   try {
     // Send initial progress
     sendProgress({
@@ -123,6 +140,7 @@ export default async function handler(req, res) {
         headless: true,
         ignoreHTTPSErrors: true,
         args: [
+          ...Chromium.default.args,
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
@@ -130,7 +148,8 @@ export default async function handler(req, res) {
           '--disable-backgrounding-occluded-windows',
           '--disable-renderer-backgrounding'
         ],
-        timeout: 30000
+        timeout: 30000,
+        cacheDir: packDir,
       };
     }
 

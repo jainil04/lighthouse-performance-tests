@@ -30,6 +30,22 @@ export default async function handler(req, res) {
   const startTime = Date.now();
   const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
 
+  // --- 0) Prepare the font archive for chromium-min ---
+  const packDir = '/tmp/chromium-pack';
+  // ensure the directory exists
+  fs.mkdirSync(packDir, { recursive: true });
+
+  // copy the vendored fonts.tar.br into place
+  const vendored = path.join(__dirname, '../assets/fonts.tar.br');
+  const destFonts = path.join(packDir, 'fonts.tar.br');
+  fs.copyFileSync(vendored, destFonts);
+
+  // --- 1) Decompress both the fonts and the chromium binary ---
+  await decompressAssets({
+    cacheDir: packDir,
+    assets:   ['fonts', 'chromium']
+  });
+
   try {
     // Launch browser with environment-aware configuration
     let launchConfig;
@@ -51,7 +67,8 @@ export default async function handler(req, res) {
         headless: chromium.default.headless,
         ignoreHTTPSErrors: true,
         timeout: 30000,
-        locale: 'en-US'
+        locale: 'en-US',
+        cacheDir: packDir,
       };
     } else {
       // Find local Chrome installation
