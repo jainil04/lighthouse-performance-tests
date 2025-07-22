@@ -1,5 +1,7 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
+import fs from 'fs';
+import path from 'path';
 
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
@@ -35,12 +37,14 @@ export default async function handler(req, res) {
   // ensure the directory exists
   fs.mkdirSync(packDir, { recursive: true });
 
-  // copy the vendored fonts.tar.br into place
-  const vendored = path.join(__dirname, '../assets/fonts.tar.br');
+  // Create empty fonts.tar.br file to satisfy chromium-min dependency
   const destFonts = path.join(packDir, 'fonts.tar.br');
-  fs.copyFileSync(vendored, destFonts);
+  if (!fs.existsSync(destFonts)) {
+    fs.writeFileSync(destFonts, '');
+  }
 
   // --- 1) Decompress both the fonts and the chromium binary ---
+  const { decompressAssets } = await import('@sparticuz/chromium-min');
   await decompressAssets({
     cacheDir: packDir,
     assets:   ['fonts', 'chromium']

@@ -154,6 +154,13 @@ const streamingData = ref(null)
 const streamingLoading = ref(false)
 const streamingProgress = ref(null)
 
+const props = defineProps({
+  isDarkMode: {
+    type: Boolean,
+    default: false
+  }
+});
+
 async function loadProducts() {
   loading.value = true
   try {
