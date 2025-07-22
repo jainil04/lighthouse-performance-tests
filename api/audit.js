@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     let launchConfig;
 
     if (isProduction) {
-      const chromium = await import('@sparticuz/chromium');
+      const chromium = await import('@sparticuz/chromium-min');
       launchConfig = {
         args: [
           ...chromium.default.args,
@@ -45,7 +45,9 @@ export default async function handler(req, res) {
           '--disable-web-security'
         ],
         defaultViewport: chromium.default.defaultViewport,
-        executablePath: await chromium.default.executablePath(),
+        executablePath: await chromium.default.executablePath(
+          'https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar'
+        ),
         headless: chromium.default.headless,
         ignoreHTTPSErrors: true,
         timeout: 30000,
