@@ -1,7 +1,5 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
-import fs from 'fs';
-import path from 'path';
 
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
@@ -69,31 +67,8 @@ export default async function handler(req, res) {
       });
 
       // --- Setup for chromium-min ---
-      const packDir = '/tmp/chromium-pack';
-
-      // Ensure the directory exists
-      fs.mkdirSync(packDir, { recursive: true });
-
-      // Create a minimal fonts.tar.br file (empty archive)
-      const destFonts = path.join(packDir, 'fonts.tar.br');
-      if (!fs.existsSync(destFonts)) {
-        // Create a minimal tar.br file instead of copying (since file doesn't exist)
-        fs.writeFileSync(destFonts, Buffer.alloc(0)); // Empty file
-      }
-
-      // Import chromium-min and decompression function
+      // Import chromium-min
       const chromium = await import('@sparticuz/chromium-min');
-      const { decompress } = await import('@sparticuz/chromium-min');
-
-      // Decompress chromium binary (skip fonts since we don't have them)
-      try {
-        await decompress({
-          cacheDir: packDir,
-          url: 'https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar'
-        });
-      } catch (decompressError) {
-        console.warn('Font decompression failed, continuing without fonts:', decompressError);
-      }
 
       launchConfig = {
         args: [

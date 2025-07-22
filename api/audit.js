@@ -1,7 +1,5 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
-import fs from 'fs';
-import path from 'path';
 
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
@@ -32,24 +30,6 @@ export default async function handler(req, res) {
   const startTime = Date.now();
   const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
 
-  // --- 0) Prepare the font archive for chromium-min ---
-  const packDir = '/tmp/chromium-pack';
-  // ensure the directory exists
-  fs.mkdirSync(packDir, { recursive: true });
-
-  // Create empty fonts.tar.br file to satisfy chromium-min dependency
-  const destFonts = path.join(packDir, 'fonts.tar.br');
-  if (!fs.existsSync(destFonts)) {
-    fs.writeFileSync(destFonts, '');
-  }
-
-  // --- 1) Decompress both the fonts and the chromium binary ---
-  const { decompressAssets } = await import('@sparticuz/chromium-min');
-  await decompressAssets({
-    cacheDir: packDir,
-    assets:   ['fonts', 'chromium']
-  });
-
   try {
     // Launch browser with environment-aware configuration
     let launchConfig;
@@ -65,14 +45,10 @@ export default async function handler(req, res) {
           '--disable-web-security'
         ],
         defaultViewport: chromium.default.defaultViewport,
-        executablePath: await chromium.default.executablePath(
-          'https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar'
-        ),
+        executablePath: await chromium.default.executablePath(),
         headless: chromium.default.headless,
         ignoreHTTPSErrors: true,
-        timeout: 30000,
-        locale: 'en-US',
-        cacheDir: packDir,
+        timeout: 30000
       };
     } else {
       // Find local Chrome installation

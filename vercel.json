@@ -8,7 +8,7 @@
         "maxDuration": 60,
         "memory": 1024,
         "distDir": "dist",
-        "includeFiles": "node_modules/{lighthouse,@sparticuz/**, assets/fonts.tar.br}/**"
+        "includeFiles": "node_modules/{lighthouse,@sparticuz/**}/**"
       }
     },
     {
@@ -18,7 +18,7 @@
         "maxDuration": 60,
         "memory": 1024,
         "distDir": "dist",
-        "includeFiles": "node_modules/{lighthouse,@sparticuz/**, assets/fonts.tar.br}/**"
+        "includeFiles": "node_modules/{lighthouse,@sparticuz/**}/**"
       }
     }
   ],
