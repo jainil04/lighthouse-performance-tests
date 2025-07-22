@@ -13,6 +13,7 @@
     "@sparticuz/chromium": "^138.0.2",
     "@sparticuz/chromium-min": "^119.0.0",
     "@tailwindcss/vite": "^4.1.11",
+    "axe-core": "^4.10.3",
     "gsap": "^3.13.0",
     "lighthouse": "^12.8.0",
     "primeicons": "^7.0.0",
