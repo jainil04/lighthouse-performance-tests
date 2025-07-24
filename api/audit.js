@@ -194,27 +194,27 @@ export default async function handler(req, res) {
     // Process results
     const auditResult = {
       success: true,
-      url: lhr.finalUrl || url,
-      device,
-      throttle,
-      executionTime,
-      timestamp: new Date().toISOString(),
-      environment: isProduction ? 'production' : 'development',
+      // url: lhr.finalUrl || url,
+      // device,
+      // throttle,
+      // executionTime,
+      // timestamp: new Date().toISOString(),
+      // environment: isProduction ? 'production' : 'development',
       scores: {
         performance: Math.round((lhr.categories.performance?.score || 0) * 100),
         accessibility: Math.round((lhr.categories.accessibility?.score || 0) * 100),
         bestPractices: Math.round((lhr.categories['best-practices']?.score || 0) * 100),
         seo: Math.round((lhr.categories.seo?.score || 0) * 100)
       },
-      metrics: {
-        firstContentfulPaint: lhr.audits['first-contentful-paint']?.numericValue,
-        largestContentfulPaint: lhr.audits['largest-contentful-paint']?.numericValue,
-        firstMeaningfulPaint: lhr.audits['first-meaningful-paint']?.numericValue,
-        speedIndex: lhr.audits['speed-index']?.numericValue,
-        totalBlockingTime: lhr.audits['total-blocking-time']?.numericValue,
-        cumulativeLayoutShift: lhr.audits['cumulative-layout-shift']?.numericValue
-      },
-      fullReport: lhr
+      // metrics: {
+      //   firstContentfulPaint: lhr.audits['first-contentful-paint']?.numericValue,
+      //   largestContentfulPaint: lhr.audits['largest-contentful-paint']?.numericValue,
+      //   firstMeaningfulPaint: lhr.audits['first-meaningful-paint']?.numericValue,
+      //   speedIndex: lhr.audits['speed-index']?.numericValue,
+      //   totalBlockingTime: lhr.audits['total-blocking-time']?.numericValue,
+      //   cumulativeLayoutShift: lhr.audits['cumulative-layout-shift']?.numericValue
+      // },
+      // fullReport: lhr
     };
 
     res.status(200).json(auditResult);

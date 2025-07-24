@@ -70,6 +70,7 @@ export function useLighthouseAudit() {
         break
 
       case 'run-complete':
+        debugger;
         console.log(`Run ${data.currentRun}/${data.totalRuns} completed`)
         completedRuns.value = data.currentRun
 
@@ -142,8 +143,8 @@ export function useLighthouseAudit() {
         break
 
       case 'error':
-        console.error('Audit error:', data.message)
-        auditError.value = data.message
+        console.error('Audit error:', data?.message)
+        auditError.value = data?.message
         break
     }
   }

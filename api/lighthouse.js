@@ -1,6 +1,8 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
 import fs from 'fs';
+import { getLaunchConfig } from './utils/getLaunchConfig.js';
+import { getLighthouseConfig } from './utils/getLighthouseConfig.js';
 
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
@@ -8,7 +10,100 @@ process.env.LANG = 'en_US.UTF-8';
 process.env.LANGUAGE = 'en_US';
 process.env.LIGHTHOUSE_LOCALE = 'en-US';
 
+// Prepare and launch the browser, return { browser, wsEndpoint }
+async function prepareBrowser(isProduction, onProgress) {
+  onProgress({
+    type: 'progress',
+    message: isProduction
+      ? 'Configuring Chrome for serverless environment...'
+      : 'Configuring Chrome for local development...',
+    progress: 10,
+    stage: 'browser-setup',
+    timestamp: new Date().toISOString()
+  });
+  const launchConfig = await getLaunchConfig(isProduction);
+
+  onProgress({
+    type: 'progress',
+    message: 'Launching Chrome browser...',
+    progress: 20,
+    stage: 'browser-launch',
+    timestamp: new Date().toISOString()
+  });
+
+  const browser = await puppeteer.launch(launchConfig);
+  const wsEndpoint = browser.wsEndpoint();
+
+  onProgress({
+    type: 'progress',
+    message: 'Chrome launched successfully, preparing Lighthouse...',
+    progress: 30,
+    stage: 'lighthouse-setup',
+    timestamp: new Date().toISOString()
+  });
+
+  return { browser, wsEndpoint };
+}
+
+// Run Lighthouse audit and handle progress simulation
+async function runLighthouseAudit({ url, device, wsEndpoint, onProgress, i, runs, progressPerRun }) {
+  const lighthouseConfig = getLighthouseConfig(device);
+  const runStartProgress = Math.round(i * progressPerRun);
+  onProgress({
+    type: 'progress',
+    message: `Running audit ${i + 1}/${runs} for ${url}`,
+    progress: runStartProgress,
+    stage: 'audit',
+    timestamp: new Date().toISOString(),
+    totalRuns: runs
+  });
+
+  const lighthouseOptions = {
+    port: new URL(wsEndpoint).port,
+    output: 'json',
+    logLevel: 'error'
+  };
+
+  // Progress simulation
+  const progressInterval = setInterval(() => {
+    onProgress({
+      type: 'progress',
+      message: 'Running Lighthouse audit...',
+      progress: 50 + Math.random() * 30,
+      stage: 'audit-running',
+      timestamp: new Date().toISOString()
+    });
+  }, 2000);
+
+  let lhr;
+  try {
+    ({ lhr } = await lighthouse(url, lighthouseOptions, lighthouseConfig));
+  } finally {
+    clearInterval(progressInterval);
+  }
+
+  return lhr;
+}
+
+// Handle errors and send error progress
+function handleError({ onProgress, error, url, device, throttle, executionTime, isProduction }) {
+  console.error('Lighthouse streaming audit failed:', error);
+
+  onProgress({
+    type: 'error',
+    error: error.message,
+    url,
+    device,
+    throttle,
+    executionTime,
+    timestamp: new Date().toISOString(),
+    environment: isProduction ? 'production' : 'development',
+    stack: error.stack
+  });
+}
+
 export default async function handler(req, res) {
+  // console.log("*** request received ***", JSON.stringify(JSON.parse(req.body)));
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
@@ -36,249 +131,187 @@ export default async function handler(req, res) {
     'Access-Control-Allow-Headers': 'Cache-Control'
   });
 
-  let browser;
   const startTime = Date.now();
   const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
+  let browser;
 
-  // Helper function to send progress updates
-  function sendProgress(data) {
+  // Progress callback function
+  const onProgress = (data) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
-  }
+  };
 
   try {
-    // Send initial progress
-    sendProgress({
+    onProgress({
       type: 'progress',
-      message: 'Initializing Lighthouse audit...',
+      message: 'Launching Chrome browser...',
       progress: 0,
       stage: 'initialization',
       timestamp: new Date().toISOString()
     });
 
-    // Launch browser with environment-aware configuration
-    let launchConfig;
+    // Prepare browser and get wsEndpoint
+    const browserResult = await prepareBrowser(isProduction, onProgress);
+    browser = browserResult.browser;
+    const wsEndpoint = browserResult.wsEndpoint;
+    // Multiple runs support
+    const runResults = [];
+    for (let i = 0; i < runs; i++) {
+      const progressPerRun = 100 / runs;
+      // Run Lighthouse audit
+      const lhr = await runLighthouseAudit({ url, device, wsEndpoint, onProgress, i, runs, progressPerRun });
+      const executionTime = Date.now() - startTime;
 
-    if (isProduction) {
-      sendProgress({
-        type: 'progress',
-        message: 'Configuring Chrome for serverless environment...',
-        progress: 10,
-        stage: 'browser-setup',
-        timestamp: new Date().toISOString()
-      });
-
-      // --- Setup for chromium ---
-      // Import regular chromium package for better compatibility
-      const chromium = await import('@sparticuz/chromium');
-
-      launchConfig = {
-        args: [
-          ...chromium.default.args,
-          '--lang=en-US',
-          '--accept-lang=en-US',
-          '--hide-scrollbars',
-          '--disable-web-security',
-          '--disable-font-subpixel-positioning', // Disable advanced font features
-          '--disable-features=VizDisplayCompositor' // Reduce font dependencies
-        ],
-        defaultViewport: chromium.default.defaultViewport,
-        executablePath: await chromium.default.executablePath(),
-        headless: chromium.default.headless,
-        ignoreHTTPSErrors: true,
-        timeout: 30000
+      // Extract scores and key metrics
+      const scores = {
+        performance: Math.round(lhr.categories.performance?.score * 100) || 0,
+        accessibility: Math.round(lhr.categories.accessibility?.score * 100) || 0,
+        bestPractices: Math.round(lhr.categories['best-practices']?.score * 100) || 0,
+        seo: Math.round(lhr.categories.seo?.score * 100) || 0
       };
-    } else {
-      sendProgress({
-        type: 'progress',
-        message: 'Configuring Chrome for local development...',
-        progress: 10,
-        stage: 'browser-setup',
-        timestamp: new Date().toISOString()
-      });
 
-      // Find local Chrome installation
-      const possiblePaths = [
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        '/Applications/Chromium.app/Contents/MacOS/Chromium',
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/google-chrome',
-        '/usr/bin/chromium-browser',
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
-      ];
+      // Extract comprehensive metrics
+      const metrics = {
+        // Core Web Vitals
+        firstContentfulPaint: lhr.audits['first-contentful-paint']?.numericValue || 0,
+        largestContentfulPaint: lhr.audits['largest-contentful-paint']?.numericValue || 0,
+        speedIndex: lhr.audits['speed-index']?.numericValue || 0,
+        totalBlockingTime: lhr.audits['total-blocking-time']?.numericValue || 0,
+        cumulativeLayoutShift: lhr.audits['cumulative-layout-shift']?.numericValue || 0,
 
-      let executablePath = null;
+        // Additional Performance Metrics
+        firstMeaningfulPaint: lhr.audits['first-meaningful-paint']?.numericValue || 0,
+        timeToInteractive: lhr.audits['interactive']?.numericValue || 0,
+        maxPotentialFirstInputDelay: lhr.audits['max-potential-fid']?.numericValue || 0,
 
-      for (const chromePath of possiblePaths) {
-        if (fs.existsSync(chromePath)) {
-          executablePath = chromePath;
-          break;
+        // Network & Resource Metrics
+        serverResponseTime: lhr.audits['server-response-time']?.numericValue || 0,
+        mainThreadWork: lhr.audits['mainthread-work-breakdown']?.numericValue || 0,
+        bootupTime: lhr.audits['bootup-time']?.numericValue || 0,
+
+        // Resource Metrics
+        totalByteWeight: lhr.audits['total-byte-weight']?.numericValue || 0,
+        unusedJavascript: lhr.audits['unused-javascript']?.numericValue || 0,
+        unusedCssRules: lhr.audits['unused-css-rules']?.numericValue || 0,
+
+        // Image Optimization
+        unoptimizedImages: lhr.audits['unoptimized-images']?.numericValue || 0,
+        modernImageFormats: lhr.audits['modern-image-formats']?.numericValue || 0,
+        efficientAnimatedContent: lhr.audits['efficient-animated-content']?.numericValue || 0,
+
+        // Additional Opportunities
+        renderBlockingResources: lhr.audits['render-blocking-resources']?.numericValue || 0,
+        duplicatedJavascript: lhr.audits['duplicated-javascript']?.numericValue || 0,
+        legacyJavascript: lhr.audits['legacy-javascript']?.numericValue || 0
+      };
+
+      // Extract opportunities (potential savings)
+      const opportunities = {};
+      Object.keys(lhr.audits).forEach(auditKey => {
+        const audit = lhr.audits[auditKey];
+        if (audit.details && audit.details.overallSavingsMs) {
+          opportunities[auditKey] = {
+            title: audit.title,
+            description: audit.description,
+            savingsMs: audit.details.overallSavingsMs,
+            savingsBytes: audit.details.overallSavingsBytes || 0,
+            score: audit.score
+          };
         }
-      }
+      });
 
-      if (!executablePath) {
-        throw new Error('No Chrome installation found. Please install Google Chrome or Chromium.');
-      }
+      // Extract diagnostics
+      const diagnostics = {};
+      Object.keys(lhr.audits).forEach(auditKey => {
+        const audit = lhr.audits[auditKey];
+        if (audit.scoreDisplayMode === 'informative' || audit.scoreDisplayMode === 'notApplicable') {
+          diagnostics[auditKey] = {
+            title: audit.title,
+            description: audit.description,
+            displayValue: audit.displayValue,
+            score: audit.score,
+            numericValue: audit.numericValue
+          };
+        }
+      });
 
-      launchConfig = {
-        executablePath,
-        headless: true,
-        ignoreHTTPSErrors: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--lang=en-US',
-          '--accept-lang=en-US'
-        ],
-        timeout: 30000
-      };
+      runResults.push({
+        diagnostics,
+        metrics,
+        opportunities,
+        run: i + 1,
+        scores,
+        timestamp: new Date().toISOString(),
+        url: lhr.finalUrl || url,
+        ...(auditView === 'full' && {
+          fullReport: {
+            categories: lhr.categories,
+            audits: lhr.audits,
+            configSettings: lhr.configSettings
+          }
+        })
+      });
+      const runCompleteProgress = Math.round((i + 1) * progressPerRun);
+      console.log(`[PROGRESS] Completed run ${i + 1}/${runs} - Progress: ${runCompleteProgress}%`);
+      onProgress({
+        type: 'run-complete',
+        message: `Completed run ${i + 1}/${runs}`,
+        progress: runCompleteProgress,
+        stage: 'run-complete',
+        currentRun: i + 1,
+        totalRuns: runs,
+        runResult: {
+          run: i + 1,
+          scores,
+          metrics,
+          opportunities,
+          diagnostics
+        }
+      });
+      // Small delay to ensure proper SSE flushing before next run
+      if (i < runs - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
 
-    // Launch browser
-    sendProgress({
+    onProgress({
       type: 'progress',
-      message: 'Launching Chrome browser...',
-      progress: 20,
-      stage: 'browser-launch',
-      timestamp: new Date().toISOString()
-    });
-
-    browser = await puppeteer.launch(launchConfig);
-    const wsEndpoint = browser.wsEndpoint();
-
-    sendProgress({
-      type: 'progress',
-      message: 'Chrome launched successfully, preparing Lighthouse...',
-      progress: 30,
-      stage: 'lighthouse-setup',
-      timestamp: new Date().toISOString()
-    });
-
-    // Lighthouse configuration - minimal to avoid dependency issues
-    const lighthouseConfig = {
-      extends: 'lighthouse:default',
-      settings: {
-        locale: 'en-US',
-        onlyCategories: ['performance', 'best-practices', 'seo'], // Remove accessibility to avoid axe-core
-        formFactor: device === 'mobile' ? 'mobile' : 'desktop',
-        screenEmulation: device === 'mobile' ? {
-          mobile: true,
-          width: 375,
-          height: 667,
-          deviceScaleFactor: 2,
-          disabled: false,
-        } : {
-          mobile: false,
-          width: 1920,
-          height: 1080,
-          deviceScaleFactor: 1,
-          disabled: false,
-        },
-        maxWaitForLoad: 45000,
-        skipAudits: [
-          'screenshot-thumbnails',
-          'final-screenshot',
-          'largest-contentful-paint-element',
-          'layout-shift-elements',
-          'full-page-screenshot',
-          'mainthread-work-breakdown'
-        ]
-      }
-    };
-
-    // Run Lighthouse audit
-    sendProgress({
-      type: 'progress',
-      message: `Starting Lighthouse audit for ${url}...`,
-      progress: 40,
-      stage: 'audit-start',
-      timestamp: new Date().toISOString()
-    });
-
-    const lighthouseOptions = {
-      port: new URL(wsEndpoint).port,
-      output: 'json',
-      logLevel: 'error'
-    };
-
-    // Progress simulation
-    const progressInterval = setInterval(() => {
-      sendProgress({
-        type: 'progress',
-        message: 'Running Lighthouse audit...',
-        progress: 50 + Math.random() * 30,
-        stage: 'audit-running',
-        timestamp: new Date().toISOString()
-      });
-    }, 2000);
-
-    const { lhr } = await lighthouse(url, lighthouseOptions, lighthouseConfig);
-
-    clearInterval(progressInterval);
-
-    // Process results
-    const executionTime = Date.now() - startTime;
-    const auditResult = {
-      success: true,
-      url: lhr.finalUrl || url,
-      device,
-      throttle,
-      runs,
-      auditView,
-      executionTime,
-      timestamp: new Date().toISOString(),
-      environment: isProduction ? 'production' : 'development',
-      scores: {
-        performance: Math.round((lhr.categories.performance?.score || 0) * 100),
-        accessibility: 0, // Set to 0 since we're not running accessibility audits
-        bestPractices: Math.round((lhr.categories['best-practices']?.score || 0) * 100),
-        seo: Math.round((lhr.categories.seo?.score || 0) * 100)
-      },
-      metrics: {
-        firstContentfulPaint: lhr.audits['first-contentful-paint']?.numericValue,
-        largestContentfulPaint: lhr.audits['largest-contentful-paint']?.numericValue,
-        speedIndex: lhr.audits['speed-index']?.numericValue,
-        totalBlockingTime: lhr.audits['total-blocking-time']?.numericValue,
-        cumulativeLayoutShift: lhr.audits['cumulative-layout-shift']?.numericValue
-      },
-      fullReport: auditView === 'detailed' ? lhr : null
-    };
-
-    sendProgress({
-      type: 'progress',
-      message: 'Audit complete!',
+      message: 'Processing final results...',
       progress: 100,
-      stage: 'complete',
-      timestamp: new Date().toISOString()
+      stage: 'finalizing'
     });
 
-    sendProgress({
-      type: 'complete',
-      result: auditResult
-    });
-
-    res.end();
-
-  } catch (error) {
-    const executionTime = Date.now() - startTime;
-    console.error('Lighthouse streaming audit failed:', error);
-
-    sendProgress({
-      type: 'error',
-      error: error.message,
+    const summary = {
+      totalRuns: runs,
       url,
       device,
       throttle,
-      executionTime,
-      timestamp: new Date().toISOString(),
-      environment: isProduction ? 'production' : 'development',
-      stack: error.stack
-    });
+      auditView
+    };
 
+    if (runs > 1) {
+      const averages = calculateAverages(runResults);
+      onProgress({
+        type: 'complete',
+        data: {
+          runs: runResults,
+          averages,
+          summary
+        }
+      });
+    } else {
+      onProgress({
+        type: 'complete',
+        data: {
+          run: runResults[0],
+          summary
+        }
+      });
+    }
+
+    res.end();
+  } catch (error) {
+    const executionTime = Date.now() - startTime;
+    handleError({ onProgress, error, url, device, throttle, executionTime, isProduction });
     res.end();
   } finally {
     if (browser) {
@@ -289,4 +322,51 @@ export default async function handler(req, res) {
       }
     }
   }
+}
+
+function calculateAverages(results) {
+  const avgScores = {
+    performance: 0,
+    accessibility: 0,
+    bestPractices: 0,
+    seo: 0
+  };
+
+  // Get all metric keys from the first result
+  const metricKeys = Object.keys(results[0].metrics);
+  const avgMetrics = {};
+  metricKeys.forEach(key => {
+    avgMetrics[key] = 0;
+  });
+
+  results.forEach(result => {
+    Object.keys(avgScores).forEach(key => {
+      avgScores[key] += result.scores[key];
+    });
+
+    Object.keys(avgMetrics).forEach(key => {
+      avgMetrics[key] += result.metrics[key] || 0;
+    });
+  });
+
+  const count = results.length;
+
+  Object.keys(avgScores).forEach(key => {
+    avgScores[key] = Math.round(avgScores[key] / count);
+  });
+
+  Object.keys(avgMetrics).forEach(key => {
+    avgMetrics[key] = Math.round(avgMetrics[key] / count);
+  });
+
+  // Aggregate opportunities and diagnostics (take from first result since they're not numerical averages)
+  const opportunities = results[0].opportunities || {};
+  const diagnostics = results[0].diagnostics || {};
+
+  return {
+    scores: avgScores,
+    metrics: avgMetrics,
+    opportunities,
+    diagnostics
+  };
 }
