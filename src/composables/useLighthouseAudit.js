@@ -67,10 +67,14 @@ export function useLighthouseAudit() {
 
       case 'progress':
         console.log(`Progress: ${progress.value}% - ${data.message}`)
+        // Ensure progress value is explicitly set for progress events
+        if (data.progress !== undefined) {
+          completedRuns.value = completedRuns.value++;
+          progress.value = calculateProgress(data.progress, data.currentRun, data.totalRuns)
+        }
         break
 
       case 'run-complete':
-        debugger;
         console.log(`Run ${data.currentRun}/${data.totalRuns} completed`)
         completedRuns.value = data.currentRun
 

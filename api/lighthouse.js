@@ -55,7 +55,8 @@ async function runLighthouseAudit({ url, device, wsEndpoint, onProgress, i, runs
     progress: runStartProgress,
     stage: 'audit',
     timestamp: new Date().toISOString(),
-    totalRuns: runs
+    totalRuns: runs,
+    currentRun: i + 1,
   });
 
   const lighthouseOptions = {
