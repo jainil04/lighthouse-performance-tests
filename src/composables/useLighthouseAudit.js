@@ -39,7 +39,7 @@ export function useLighthouseAudit() {
   }
 
   const handleProgressUpdate = (data) => {
-    console.log('Frontend received progress update:', data)
+    console.log('🔄 Frontend received progress update:', data)
 
     // Store total runs for progress calculation
     if (data.totalRuns) {
@@ -49,27 +49,32 @@ export function useLighthouseAudit() {
     // Calculate progress based on runs and individual run progress
     if (data.currentRun && data.totalRuns) {
       const runProgress = data.progress || 0
-      progress.value = calculateProgress(runProgress, data.currentRun, data.totalRuns)
-    } else {
-      progress.value = data.progress || 0
+      const calculatedProgress = calculateProgress(runProgress, data.currentRun, data.totalRuns)
+      console.log(`📊 Calculated progress: ${calculatedProgress}% (from run ${data.currentRun}/${data.totalRuns}, progress: ${runProgress}%)`)
+      progress.value = calculatedProgress
+    } else if (data.progress !== undefined) {
+      // For initial progress updates without run context, use direct progress
+      console.log(`📊 Direct progress: ${data.progress}%`)
+      progress.value = data.progress
     }
 
     currentMessage.value = data.message || ''
     currentStage.value = data.stage || ''
 
-    console.log(`Progress: ${progress.value}%, Message: ${currentMessage.value}, Stage: ${currentStage.value}`)
+    console.log(`📈 Final state - Progress: ${progress.value}%, Message: "${currentMessage.value}", Stage: "${currentStage.value}"`)
 
     switch (data.type) {
       case 'start':
-        console.log('Audit started:', data.message)
+        console.log('🚀 Audit started:', data.message)
         completedRuns.value = 0
+        // Reset progress for new audit
+        progress.value = data.progress || 0
         break
 
       case 'progress':
         console.log(`Progress: ${progress.value}% - ${data.message}`)
-        // Ensure progress value is explicitly set for progress events
-        if (data.progress !== undefined) {
-          completedRuns.value = completedRuns.value++;
+        // Update progress without incrementing completed runs
+        if (data.progress !== undefined && data.currentRun && data.totalRuns) {
           progress.value = calculateProgress(data.progress, data.currentRun, data.totalRuns)
         }
         break

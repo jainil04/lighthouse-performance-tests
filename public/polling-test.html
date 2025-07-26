@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Polling Test</title>
+</head>
+<body>
+    <h1>Polling Audit Test</h1>
+    <button onclick="startAudit()">Start Audit</button>
+    <div id="status">Ready</div>
+    <div id="logs"></div>
+
+    <script>
+        let auditId = null;
+        let polling = false;
+
+        async function startAudit() {
+            const statusDiv = document.getElementById('status');
+            const logsDiv = document.getElementById('logs');
+
+            try {
+                statusDiv.innerHTML = 'Starting audit...';
+
+                // Start audit
+                const response = await fetch('/api/lighthouse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: 'https://example.com',
+                        usePolling: true,
+                        runs: 1
+                    })
+                });
+
+                const result = await response.json();
+                auditId = result.auditId;
+
+                statusDiv.innerHTML = `Audit started: ${auditId}`;
+                logsDiv.innerHTML += `<div>Audit ID: ${auditId}</div>`;
+
+                // Start polling
+                startPolling();
+
+            } catch (error) {
+                statusDiv.innerHTML = `Error: ${error.message}`;
+                logsDiv.innerHTML += `<div>Error: ${error.message}</div>`;
+            }
+        }
+
+        async function startPolling() {
+            if (polling || !auditId) return;
+            polling = true;
+
+            const statusDiv = document.getElementById('status');
+            const logsDiv = document.getElementById('logs');
+
+            while (polling) {
+                try {
+                    const response = await fetch(`/api/audit-status?auditId=${auditId}`);
+                    const status = await response.json();
+
+                    logsDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${status.type} - ${status.message} (${status.progress}%)</div>`;
+
+                    if (status.type === 'complete' || status.type === 'error') {
+                        polling = false;
+                        statusDiv.innerHTML = `Completed: ${status.type}`;
+                    }
+
+                } catch (error) {
+                    logsDiv.innerHTML += `<div>Polling error: ${error.message}</div>`;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    </script>
+</body>
+</html>

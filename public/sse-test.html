@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; background: #f9f9f9; }
+        .message { margin: 5px 0; padding: 5px; background: white; border-radius: 3px; }
+        .progress { background: #e7f3ff; }
+        .error { background: #ffe7e7; }
+        .complete { background: #e7ffe7; }
+        button { padding: 10px 20px; margin: 10px 0; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>SSE Streaming Test</h1>
+
+    <button onclick="testStream()">Test /api/test-stream</button>
+    <button onclick="testLighthouse()">Test /api/lighthouse (SSE)</button>
+    <button onclick="testPolling()">Test /api/lighthouse (Polling)</button>
+    <button onclick="clearLog()">Clear Log</button>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        function addLog(message, type = 'message') {
+            const log = document.getElementById('log');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function testStream() {
+            addLog('Starting SSE test stream...', 'progress');
+
+            const eventSource = new EventSource('/api/test-stream');
+
+            eventSource.onopen = function() {
+                addLog('SSE Connection opened', 'progress');
+            };
+
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    addLog(`[${data.type}] ${data.message} (${data.progress}%)`, data.type);
+
+                    if (data.type === 'complete') {
+                        eventSource.close();
+                        addLog('Test stream completed', 'complete');
+                    }
+                } catch (e) {
+                    addLog(`Parse error: ${e.message}`, 'error');
+                }
+            };
+
+            eventSource.onerror = function(event) {
+                addLog(`SSE Error: ${event}`, 'error');
+                eventSource.close();
+            };
+        }
+
+        function testLighthouse() {
+            addLog('Starting Lighthouse SSE test...', 'progress');
+
+            const startTime = Date.now();
+            let messageCount = 0;
+
+            // Test with a simple URL
+            fetch('/api/lighthouse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: 'https://example.com',
+                    device: 'desktop',
+                    throttle: 'none',
+                    runs: 1,
+                    auditView: 'standard'
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const auditId = response.headers.get('X-Audit-ID');
+                addLog(`Audit ID: ${auditId}`, 'progress');
+                addLog('Lighthouse response received, reading stream...', 'progress');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function readStream() {
+                    reader.read().then(({done, value}) => {
+                        if (done) {
+                            const totalTime = Date.now() - startTime;
+                            addLog(`Stream completed - Total time: ${totalTime}ms, Messages: ${messageCount}`, 'complete');
+                            return;
+                        }
+
+                        const chunk = decoder.decode(value);
+                        buffer += chunk;
+
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop();
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ') && line.length > 6) {
+                                try {
+                                    const jsonData = line.slice(6).trim();
+                                    if (jsonData) {
+                                        messageCount++;
+                                        const timeSinceStart = Date.now() - startTime;
+                                        const data = JSON.parse(jsonData);
+                                        addLog(`[${timeSinceStart}ms] #${messageCount} [${data.type}] ${data.message} (${data.progress}%)`, data.type);
+                                    }
+                                } catch (parseError) {
+                                    addLog(`Parse error: ${parseError.message}`, 'error');
+                                }
+                            }
+                        }
+
+                        readStream();
+                    });
+                }
+
+                readStream();
+            })
+            .catch(error => {
+                addLog(`Fetch error: ${error.message}`, 'error');
+            });
+        }
+        function testPolling() {
+            addLog('Starting Lighthouse Polling test...', 'progress');
+
+            const startTime = Date.now();
+            let updateCount = 0;
+            let pollingInterval;
+
+            // Start the audit with polling enabled
+            fetch('/api/lighthouse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: 'https://example.com',
+                    device: 'desktop',
+                    throttle: 'none',
+                    runs: 1,
+                    auditView: 'standard',
+                    usePolling: true
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                const auditId = result.auditId;
+                addLog(`Audit started with ID: ${auditId}`, 'progress');
+                addLog('Starting to poll for updates...', 'progress');
+
+                // Start polling for updates
+                let lastStatus = null;
+                pollingInterval = setInterval(async () => {
+                    try {
+                        const statusResponse = await fetch(`/api/audit-status?auditId=${auditId}`);
+                        const status = await statusResponse.json();
+
+                        if (status.status === 'not-found') {
+                            addLog('Waiting for audit to start...', 'progress');
+                            return;
+                        }
+
+                        // Only log if status changed
+                        const statusKey = `${status.type}-${status.progress}-${status.message}`;
+                        if (lastStatus !== statusKey) {
+                            lastStatus = statusKey;
+                            updateCount++;
+                            const timeSinceStart = Date.now() - startTime;
+                            addLog(`[${timeSinceStart}ms] #${updateCount} [${status.type}] ${status.message} (${status.progress}%)`, status.type);
+                        }
+
+                        // Stop polling when complete
+                        if (status.type === 'complete' || status.type === 'error') {
+                            clearInterval(pollingInterval);
+                            const totalTime = Date.now() - startTime;
+                            addLog(`Polling completed - Total time: ${totalTime}ms, Updates: ${updateCount}`, 'complete');
+                        }
+                    } catch (pollError) {
+                        addLog(`Polling error: ${pollError.message}`, 'error');
+                    }
+                }, 800); // Poll every 800ms
+            })
+            .catch(error => {
+                addLog(`Fetch error: ${error.message}`, 'error');
+                if (pollingInterval) clearInterval(pollingInterval);
+            });
+        }
+    </script>
+</body>
+</html>

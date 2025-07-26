@@ -2,78 +2,155 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /**
- * Stream Lighthouse audit with real-time progress updates
- * @param {Object} auditConfig - Audit configuration
- * @param {string} auditConfig.url - URL to audit
- * @param {string} auditConfig.device - Device type ('desktop' or 'mobile')
- * @param {string} auditConfig.throttle - Network throttling ('none', '3g', '4g', 'slow', 'fast')
- * @param {number} auditConfig.runs - Number of runs (1-10)
- * @param {string} auditConfig.auditView - Audit view ('standard' or 'full')
- * @param {Function} onProgress - Progress callback function
- * @returns {Promise} - Resolves when audit completes
+ * Polling-based Lighthouse audit with real-time progress updates
+ * This works reliably on Vercel where SSE gets buffered
  */
 export async function streamLighthouseAudit(auditConfig, onProgress) {
-  try {
-    console.log('Starting streaming audit with config:', auditConfig);
+  console.log('🚀 Starting polling-based audit with config:', auditConfig);
 
+  let auditId = null;
+  let pollingInterval = null;
+  let isComplete = false;
+
+  try {
+    // Start the audit (this will run in background)
     const response = await fetch("/api/lighthouse", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(auditConfig)
+      body: JSON.stringify({
+        ...auditConfig,
+        usePolling: true // Signal to use polling mode
+      })
     });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    console.log('Response received, starting to read stream...');
+    // Get audit ID from response
+    auditId = response.headers.get('X-Audit-ID');
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value);
-      buffer += chunk;
-
-      const lines = buffer.split('\n');
-      // Keep the last incomplete line in the buffer
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (line.startsWith('data: ') && line.length > 6) {
-          try {
-            const jsonData = line.slice(6).trim();
-            if (jsonData) {
-              const data = JSON.parse(jsonData);
-              console.log('Received SSE data:', data);
-              onProgress(data);
-
-              // If it's an error, throw to be caught by caller
-              if (data.type === 'error') {
-                throw new Error(data.message);
-              }
-            }
-          } catch (parseError) {
-            if (parseError.message.includes('Failed to run Lighthouse audit')) {
-              // Re-throw lighthouse errors
-              throw parseError;
-            }
-            console.warn('Failed to parse SSE data:', line, parseError);
-          }
-        }
-      }
+    if (!auditId) {
+      // Fallback: try to get from response body
+      const result = await response.json();
+      auditId = result.auditId;
     }
 
-    console.log('Stream reading completed');
+    console.log('📝 Audit ID:', auditId);
+
+    if (!auditId) {
+      throw new Error('No audit ID received from server');
+    }
+
+    // Send initial start message
+    onProgress({
+      type: 'start',
+      message: 'Audit started, polling for updates...',
+      progress: 0,
+      stage: 'starting',
+      timestamp: new Date().toISOString()
+    });
+
+    // Start polling for progress updates
+    let lastStatus = null;
+    pollingInterval = setInterval(async () => {
+      try {
+        console.log('🔄 Polling for status update...');
+
+        // First, try to advance the progress
+        let advanceResult = null;
+        try {
+          const advanceResponse = await fetch('/api/advance-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auditId })
+          });
+
+          if (advanceResponse.ok) {
+            advanceResult = await advanceResponse.json();
+            console.log('⬆️ Progress advanced:', advanceResult);
+          }
+        } catch (advanceError) {
+          console.warn('⚠️ Progress advance failed:', advanceError);
+        }
+
+        // Then get the current status
+        const statusResponse = await fetch(`/api/audit-status?auditId=${auditId}`);
+
+        if (!statusResponse.ok) {
+          console.warn('⚠️ Status fetch failed:', statusResponse.status);
+          return;
+        }
+
+        const status = await statusResponse.json();
+        console.log('📊 Received status:', status);
+
+        if (status.status === 'not-found') {
+          console.log('⏳ Audit not started yet, continuing to poll...');
+          return;
+        }
+
+        // Only send update if status changed (use timestamp as unique key)
+        const statusKey = `${status.type}-${status.progress}-${status.timestamp}`;
+        if (lastStatus !== statusKey) {
+          lastStatus = statusKey;
+          onProgress(status);
+          console.log('📢 Sent progress update:', status.message, status.progress + '%');
+        } else {
+          console.log('🔄 Status unchanged, skipping update');
+        }
+
+        // Stop polling when complete
+        if (status.type === 'complete' || status.type === 'error') {
+          console.log('✅ Audit completed, stopping polling');
+          isComplete = true;
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+
+          if (status.type === 'error') {
+            throw new Error(status.message);
+          }
+        }
+      } catch (pollError) {
+        console.error('❌ Polling error:', pollError);
+
+        // Don't stop polling for network errors, but stop for other errors
+        if (!pollError.message.includes('fetch')) {
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+          throw pollError;
+        }
+      }
+    }, 800); // Poll every 800ms for smooth updates
+
+    // Wait for completion or timeout
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (!isComplete) {
+          clearInterval(pollingInterval);
+          reject(new Error('Audit timed out after 5 minutes'));
+        }
+      }, 5 * 60 * 1000); // 5 minute timeout
+
+      const checkComplete = setInterval(() => {
+        if (isComplete) {
+          clearInterval(checkComplete);
+          clearTimeout(timeout);
+          resolve();
+        }
+      }, 100);
+    });
+
   } catch (error) {
-    console.error('Stream error:', error);
+    console.error('❌ Audit error:', error);
+
+    // Cleanup
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
 
     // Send error to progress callback
     onProgress({
