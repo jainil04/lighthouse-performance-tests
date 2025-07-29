@@ -4,6 +4,7 @@ import WelcomeSection from '../components/ui/sections/WelcomeSection.vue'
 import AuditProgress from '../components/ui/common/AuditProgress.vue'
 import PerformanceMetrics from '../components/ui/sections/PerformanceMetrics.vue'
 import AuditResults from '../components/ui/sections/AuditResults.vue'
+import Footer from '../components/ui/common/Footer.vue'
 import { useLighthouseAudit } from '../composables/useLighthouseAudit.js'
 
 const urlValue = ref('')
@@ -106,6 +107,11 @@ const isDarkMode = inject('isDarkMode', ref(false))
       :detailed-metrics="detailedMetrics"
       :opportunities="opportunities"
       :diagnostics="diagnostics"
+      :is-dark-mode="isDarkMode"
+    />
+
+    <!-- System Status Footer -->
+    <Footer
       :is-dark-mode="isDarkMode"
     />
   </div>
