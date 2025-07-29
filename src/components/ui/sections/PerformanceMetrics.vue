@@ -111,8 +111,8 @@ const animateContent = () => {
 
 // Watch for scores changes to show/hide component
 watch(() => props.scores, (newScores, oldScores) => {
-  const hasScores = newScores && Object.keys(newScores).length > 0
-  const hadScores = oldScores && Object.keys(oldScores).length > 0
+  const hasScores = newScores && Object.values(newScores).some(v => typeof v === 'number')
+  const hadScores = oldScores && Object.values(oldScores).some(v => typeof v === 'number')
 
   if (hasScores && !hadScores) {
     // Show component when scores first appear
@@ -131,7 +131,7 @@ watch(() => props.scores, (newScores, oldScores) => {
 
 // Initial check on mount
 onMounted(() => {
-  const hasScores = props.scores && Object.keys(props.scores).length > 0
+const hasScores = props.scores && Object.values(props.scores).some(v => typeof v === 'number')
   if (hasScores) {
     shouldShowComponent.value = true
     nextTick(() => {
