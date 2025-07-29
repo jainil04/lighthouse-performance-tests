@@ -46,12 +46,18 @@ export function useLighthouseAudit() {
       totalRuns.value = data.totalRuns
     }
 
-    // Calculate progress based on runs and individual run progress
+    // Calculate new progress based on runs and individual run progress
+    let newProgress = 0
     if (data.currentRun && data.totalRuns) {
       const runProgress = data.progress || 0
-      progress.value = calculateProgress(runProgress, data.currentRun, data.totalRuns)
+      newProgress = calculateProgress(runProgress, data.currentRun, data.totalRuns)
     } else {
-      progress.value = data.progress || 0
+      newProgress = data.progress || 0
+    }
+
+    // Only update progress if it's higher than current progress (monotonic increase)
+    if (newProgress > progress.value) {
+      progress.value = newProgress
     }
 
     currentMessage.value = data.message || ''
@@ -63,19 +69,23 @@ export function useLighthouseAudit() {
       case 'start':
         console.log('Audit started:', data.message)
         completedRuns.value = 0
+        progress.value = 0 // Reset to 0 at start
         break
 
       case 'progress':
         console.log(`Progress: ${progress.value}% - ${data.message}`)
+        // Progress updates handled above with monotonic increase
         break
 
       case 'run-complete':
-        debugger;
         console.log(`Run ${data.currentRun}/${data.totalRuns} completed`)
         completedRuns.value = data.currentRun
 
-        // Update progress to show run completion
-        progress.value = calculateProgress(100, data.currentRun, data.totalRuns)
+        // Ensure run completion shows proper progress for that run
+        const runCompleteProgress = calculateProgress(100, data.currentRun, data.totalRuns)
+        if (runCompleteProgress > progress.value) {
+          progress.value = runCompleteProgress
+        }
 
         // Update scores with latest run results
         if (data.runResult && data.runResult.scores) {

@@ -46,16 +46,17 @@ async function prepareBrowser(isProduction, onProgress) {
 }
 
 // Run Lighthouse audit and handle progress simulation
-async function runLighthouseAudit({ url, device, wsEndpoint, onProgress, i, runs, progressPerRun }) {
+async function runLighthouseAudit({ url, device, wsEndpoint, onProgress, i, runs, progressPerRun, baseProgress }) {
   const lighthouseConfig = getLighthouseConfig(device);
-  const runStartProgress = Math.round(i * progressPerRun);
+  const runStartProgress = baseProgress || Math.round(i * progressPerRun);
   onProgress({
     type: 'progress',
     message: `Running audit ${i + 1}/${runs} for ${url}`,
     progress: runStartProgress,
     stage: 'audit',
-    timestamp: new Date().toISOString(),
-    totalRuns: runs
+    currentRun: i + 1,
+    totalRuns: runs,
+    timestamp: new Date().toISOString()
   });
 
   const lighthouseOptions = {
@@ -64,13 +65,23 @@ async function runLighthouseAudit({ url, device, wsEndpoint, onProgress, i, runs
     logLevel: 'error'
   };
 
-  // Progress simulation
+  // Progress simulation with proper incremental progress
+  let auditProgress = runStartProgress + 10; // Start at 10% into this run
   const progressInterval = setInterval(() => {
+    // Gradually increase progress by 5-10% each interval
+    auditProgress += Math.floor(Math.random() * 5) + 5;
+
+    // Cap progress at 90% of this run's allocation to leave room for completion
+    const maxProgressForThisRun = runStartProgress + (progressPerRun * 0.9);
+    auditProgress = Math.min(auditProgress, maxProgressForThisRun);
+
     onProgress({
       type: 'progress',
       message: 'Running Lighthouse audit...',
-      progress: 50 + Math.random() * 30,
+      progress: auditProgress,
       stage: 'audit-running',
+      currentRun: i + 1,
+      totalRuns: runs,
       timestamp: new Date().toISOString()
     });
   }, 2000);
@@ -135,16 +146,27 @@ export default async function handler(req, res) {
   const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
   let browser;
 
-  // Progress callback function
+  // Global progress tracking to ensure monotonic increase
+  let globalProgress = 0;
+
+  // Progress callback function with monotonic increase
   const onProgress = (data) => {
+    // Ensure progress only increases
+    if (data.progress && data.progress > globalProgress) {
+      globalProgress = data.progress;
+    } else if (data.progress) {
+      data.progress = globalProgress;
+    }
+
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
   try {
+    globalProgress = 0;
     onProgress({
       type: 'progress',
       message: 'Launching Chrome browser...',
-      progress: 0,
+      progress: globalProgress,
       stage: 'initialization',
       timestamp: new Date().toISOString()
     });
@@ -153,12 +175,27 @@ export default async function handler(req, res) {
     const browserResult = await prepareBrowser(isProduction, onProgress);
     browser = browserResult.browser;
     const wsEndpoint = browserResult.wsEndpoint;
+
+    globalProgress = Math.max(globalProgress, 25);
+
     // Multiple runs support
     const runResults = [];
     for (let i = 0; i < runs; i++) {
-      const progressPerRun = 100 / runs;
+      const progressPerRun = 70 / runs; // 70% total for all runs
+      const baseProgressForRun = 25 + (i * progressPerRun); // Start after browser setup
+      globalProgress = Math.max(globalProgress, baseProgressForRun);
+
       // Run Lighthouse audit
-      const lhr = await runLighthouseAudit({ url, device, wsEndpoint, onProgress, i, runs, progressPerRun });
+      const lhr = await runLighthouseAudit({
+        url,
+        device,
+        wsEndpoint,
+        onProgress,
+        i,
+        runs,
+        progressPerRun,
+        baseProgress: baseProgressForRun
+      });
       const executionTime = Date.now() - startTime;
 
       // Extract scores and key metrics
@@ -273,10 +310,11 @@ export default async function handler(req, res) {
       }
     }
 
+    globalProgress = Math.max(globalProgress, 95);
     onProgress({
       type: 'progress',
       message: 'Processing final results...',
-      progress: 100,
+      progress: globalProgress,
       stage: 'finalizing'
     });
 
@@ -290,6 +328,7 @@ export default async function handler(req, res) {
 
     if (runs > 1) {
       const averages = calculateAverages(runResults);
+      globalProgress = 100;
       onProgress({
         type: 'complete',
         data: {
@@ -299,6 +338,7 @@ export default async function handler(req, res) {
         }
       });
     } else {
+      globalProgress = 100;
       onProgress({
         type: 'complete',
         data: {
