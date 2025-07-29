@@ -1,22 +1,11 @@
 <template>
   <div>
-    <!-- Existing buttons -->
-    <Button
-        @click="loadProducts"
-        :icon="loading ? 'pi pi-spin pi-spinner' : 'pi pi-send'"
-        severity="primary"
-        rounded
-        :class="[
-          isDarkMode ? 'p-component-dark' : 'p-component-light'
-        ]"
-      />
-
+    <!-- API Test buttons -->
     <Button
         @click="checkHealth"
         :icon="healthLoading ? 'pi pi-spin pi-spinner' : 'pi pi-heart'"
         severity="success"
         rounded
-        style="margin-left: 10px"
         :class="[
           isDarkMode ? 'p-component-dark' : 'p-component-light'
         ]"
@@ -26,29 +15,6 @@
         @click="checkStatus"
         :icon="statusLoading ? 'pi pi-spin pi-spinner' : 'pi pi-info-circle'"
         severity="info"
-        rounded
-        style="margin-left: 10px"
-        :class="[
-          isDarkMode ? 'p-component-dark' : 'p-component-light'
-        ]"
-      />
-
-    <Button
-        @click="checkDebug"
-        :icon="debugLoading ? 'pi pi-spin pi-spinner' : 'pi pi-cog'"
-        severity="warning"
-        rounded
-        style="margin-left: 10px"
-        :class="[
-          isDarkMode ? 'p-component-dark' : 'p-component-light'
-        ]"
-      />
-
-    <!-- New Chrome test button -->
-    <Button
-        @click="testChrome"
-        :icon="chromeLoading ? 'pi pi-spin pi-spinner' : 'pi pi-desktop'"
-        severity="contrast"
         rounded
         style="margin-left: 10px"
         :class="[
@@ -80,9 +46,6 @@
       />
 
     <!-- Display results -->
-    <ul v-if="products.length">
-      <li v-for="p in products" :key="p.id">{{ p.name }}</li>
-    </ul>
 
     <div v-if="healthData" style="margin-top: 20px; padding: 10px; background: #f0f9ff; border-radius: 4px; color: #1e40af;">
       <h4 style="color: #1e40af; margin-bottom: 10px;">Health Check Result:</h4>
@@ -92,16 +55,6 @@
     <div v-if="statusData" style="margin-top: 20px; padding: 10px; background: #fff7ed; border-radius: 4px; color: #c2410c;">
       <h4 style="color: #c2410c; margin-bottom: 10px;">Status Check Result:</h4>
       <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(statusData, null, 2) }}</pre>
-    </div>
-
-    <div v-if="debugData" style="margin-top: 20px; padding: 10px; background: #fef3c7; border-radius: 4px; color: #d97706;">
-      <h4 style="color: #d97706; margin-bottom: 10px;">Debug Check Result:</h4>
-      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(debugData, null, 2) }}</pre>
-    </div>
-
-    <div v-if="chromeData" style="margin-top: 20px; padding: 10px; background: #f3f4f6; border-radius: 4px; color: #374151;">
-      <h4 style="color: #374151; margin-bottom: 10px;">Chrome Test Result:</h4>
-      <pre style="color: #374151; background: #f9fafb; padding: 10px; border-radius: 4px; overflow-x: auto;">{{ JSON.stringify(chromeData, null, 2) }}</pre>
     </div>
   </div>
   <!-- Add this to your results section -->
@@ -138,16 +91,10 @@
 import { ref } from 'vue'
 import Button from 'primevue/button'
 
-const products = ref([])
-const loading = ref(false)
 const healthData = ref(null)
 const healthLoading = ref(false)
 const statusData = ref(null)
 const statusLoading = ref(false)
-const debugData = ref(null)
-const debugLoading = ref(false)
-const chromeData = ref(null)
-const chromeLoading = ref(false)
 const auditData = ref(null)
 const auditLoading = ref(false)
 const streamingData = ref(null)
@@ -160,19 +107,6 @@ const props = defineProps({
     default: false
   }
 });
-
-async function loadProducts() {
-  loading.value = true
-  try {
-    const res = await fetch('/api/hello')
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    products.value = await res.json()
-  } catch (err) {
-    console.error('Failed to load products:', err)
-  } finally {
-    loading.value = false
-  }
-}
 
 async function checkHealth() {
   healthLoading.value = true
@@ -199,34 +133,6 @@ async function checkStatus() {
     statusData.value = { error: err.message }
   } finally {
     statusLoading.value = false
-  }
-}
-
-async function checkDebug() {
-  debugLoading.value = true
-  try {
-    const res = await fetch('/api/debug')
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    debugData.value = await res.json()
-  } catch (err) {
-    console.error('Debug check failed:', err)
-    debugData.value = { error: err.message }
-  } finally {
-    debugLoading.value = false
-  }
-}
-
-async function testChrome() {
-  chromeLoading.value = true
-  try {
-    const res = await fetch('/api/test-chrome')
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    chromeData.value = await res.json()
-  } catch (err) {
-    console.error('Chrome test failed:', err)
-    chromeData.value = { error: err.message }
-  } finally {
-    chromeLoading.value = false
   }
 }
 
