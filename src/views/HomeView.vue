@@ -105,12 +105,24 @@ const metricsForChart = computed(() => {
       :is-dark-mode="isDarkMode"
     />
 
-    <!-- Performance Metrics -->
-    <PerformanceMetrics
-      v-if="isRunning || auditResults"
-      :scores="scores"
-      :is-dark-mode="isDarkMode"
-    />
+    <!-- Performance Metrics & Average Metrics Chart Side by Side -->
+    <div :class="currentRuns > 1 ? 'flex flex-col lg:flex-row gap-6' : ''">
+      <div :class="currentRuns > 1 ? 'flex-1' : 'w-full'">
+        <PerformanceMetrics
+          v-if="isRunning || auditResults"
+          :scores="scores"
+          :is-dark-mode="isDarkMode"
+        />
+      </div>
+      <div v-if="currentRuns > 1" class="flex-1">
+        <AverageMetricsChart
+          v-if="metricsForChart.length > 0"
+          :metrics="metricsForChart"
+          :metric-labels="metricLabels"
+          :is-dark-mode="isDarkMode"
+        />
+      </div>
+    </div>
 
 
     <!-- Audit Results -->
@@ -125,14 +137,6 @@ const metricsForChart = computed(() => {
       :detailed-metrics="detailedMetrics"
       :opportunities="opportunities"
       :diagnostics="diagnostics"
-      :is-dark-mode="isDarkMode"
-    />
-
-    <!-- Average Metrics Chart: Only show if runs > 1 -->
-    <AverageMetricsChart
-      v-if="currentRuns > 1 && metricsForChart.length > 0"
-      :metrics="metricsForChart"
-      :metric-labels="metricLabels"
       :is-dark-mode="isDarkMode"
     />
 

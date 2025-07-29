@@ -10,29 +10,25 @@
       <div class="p-6 h-full flex flex-col justify-between">
         <!-- Header with Icon and Score -->
         <div class="flex items-start justify-between mb-4">
-          <div class="flex items-center space-x-3">
-            <!-- Dynamic Icon based on metric type -->
-            <div :class="[
-              'w-10 h-10 rounded-lg flex items-center justify-center',
-              getIconBackgroundColor(),
-              'transition-all duration-300 group-hover:scale-110'
-            ]">
-              <i :class="[
-                'text-lg',
-                getIconClass(),
-                'text-white'
-              ]"></i>
-            </div>
-            <div>
-              <h4 :class="[
-                'text-sm font-medium leading-tight',
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              ]">{{ title }}</h4>
-            </div>
+        <div class="flex flex-col items-center gap-2">
+          <!-- Dynamic Icon based on metric type -->
+          <div :class="[
+            'w-10 h-10 rounded-lg flex items-center justify-center',
+            getIconBackgroundColor(),
+            'transition-all duration-300 group-hover:scale-110'
+          ]">
+            <i :class="[
+              'text-lg',
+              getIconClass(),
+              'text-white'
+            ]"></i>
           </div>
-
+          <h4 :class="[
+            'text-sm font-medium leading-tight mt-2',
+            isDarkMode ? 'text-white' : 'text-gray-900'
+          ]">{{ title }}</h4>
           <!-- Score with circular progress indicator -->
-          <div class="relative">
+          <div class="relative mt-3">
             <!-- Circular progress background -->
             <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
               <path
@@ -63,13 +59,14 @@
             </div>
           </div>
         </div>
+        </div>
 
         <!-- Description with enhanced styling -->
         <div class="space-y-2">
-          <p :class="[
+          <!-- <p :class="[
             'text-xs leading-relaxed',
             isDarkMode ? 'text-gray-300' : 'text-gray-600'
-          ]">{{ description }}</p>
+          ]">{{ description }}</p> -->
 
           <!-- Performance indicator badge -->
           <div class="flex items-center justify-between">

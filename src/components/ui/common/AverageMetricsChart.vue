@@ -112,7 +112,10 @@ watch([metrics, metricLabels, isDarkMode], () => {
 </script>
 
 <template>
-  <div>
+  <div :class="[
+    'rounded-lg shadow-sm border p-6 h-full flex flex-col justify-center',
+    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+  ]">
     <canvas ref="canvasRef"></canvas>
   </div>
 </template>
