@@ -33,7 +33,7 @@ function getChartData() {
         backgroundColor: 'rgba(255, 99, 132, 0.4)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 2,
-        borderRadius: 50,
+        borderRadius: 10,
         barPercentage: 0.7,
         categoryPercentage: 0.7
       }
