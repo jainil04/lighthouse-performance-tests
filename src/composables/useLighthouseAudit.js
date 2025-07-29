@@ -90,6 +90,7 @@ export function useLighthouseAudit() {
         // Update scores with latest run results
         if (data.runResult && data.runResult.scores) {
           scores.value = { ...data.runResult.scores }
+          console.log('Updated scores from run-complete:', scores.value);
         }
         // Update detailed metrics
         if (data.runResult && data.runResult.metrics) {
@@ -127,6 +128,7 @@ export function useLighthouseAudit() {
           if (data.data.run && data.data.run.scores) {
             // Single run
             scores.value = { ...data.data.run.scores }
+            console.log('Final scores (single run):', scores.value);
             if (data.data.run.metrics) {
               detailedMetrics.value = { ...data.data.run.metrics }
             }
@@ -139,6 +141,7 @@ export function useLighthouseAudit() {
           } else if (data.data.averages && data.data.averages.scores) {
             // Multiple runs - use averages
             scores.value = { ...data.data.averages.scores }
+            console.log('Final scores (averages):', scores.value);
             if (data.data.averages.metrics) {
               detailedMetrics.value = { ...data.data.averages.metrics }
             }

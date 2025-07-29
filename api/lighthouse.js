@@ -199,12 +199,23 @@ export default async function handler(req, res) {
       const executionTime = Date.now() - startTime;
 
       // Extract scores and key metrics
+      if (!lhr.categories) {
+        console.error('Lighthouse results missing categories');
+        throw new Error('Lighthouse audit failed - no categories in results');
+      }
+
       const scores = {
-        performance: Math.round(lhr.categories.performance?.score * 100) || 0,
-        accessibility: Math.round(lhr.categories.accessibility?.score * 100) || 0,
-        bestPractices: Math.round(lhr.categories['best-practices']?.score * 100) || 0,
-        seo: Math.round(lhr.categories.seo?.score * 100) || 0
+        performance: lhr.categories?.performance?.score ? Math.round(lhr.categories.performance.score * 100) : 0,
+        accessibility: lhr.categories?.accessibility?.score ? Math.round(lhr.categories.accessibility.score * 100) : 0,
+        bestPractices: lhr.categories?.['best-practices']?.score ? Math.round(lhr.categories['best-practices'].score * 100) : 0,
+        seo: lhr.categories?.seo?.score ? Math.round(lhr.categories.seo.score * 100) : 0
       };
+
+      // Log if performance score is 0 to debug
+      if (scores.performance === 0) {
+        console.log('Performance score is 0. Raw score:', lhr.categories?.performance?.score);
+        console.log('Performance category:', lhr.categories?.performance);
+      }
 
       // Extract comprehensive metrics
       const metrics = {
