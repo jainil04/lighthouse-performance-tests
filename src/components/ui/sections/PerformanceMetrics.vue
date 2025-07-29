@@ -18,11 +18,31 @@
       isDarkMode ? 'text-gray-300' : 'text-gray-600'
     ]">Your performance testing results will appear here.</p>
 
-    <!-- Score Cards -->
-    <div ref="scoreCardsContainer">
-      <ScoreCards
+    <!-- Metric Cards -->
+    <div ref="scoreCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <MetricCard
+        title="Performance"
+        :value="scores.performance !== null ? `${scores.performance}` : '--'"
+        description="Core Web Vitals and loading performance"
         :is-dark-mode="isDarkMode"
-        :scores="scores"
+      />
+      <MetricCard
+        title="Accessibility"
+        :value="scores.accessibility !== null ? `${scores.accessibility}` : '--'"
+        description="User experience for people with disabilities"
+        :is-dark-mode="isDarkMode"
+      />
+      <MetricCard
+        title="Best Practices"
+        :value="scores.bestPractices !== null ? `${scores.bestPractices}` : '--'"
+        description="Modern web development standards"
+        :is-dark-mode="isDarkMode"
+      />
+      <MetricCard
+        title="SEO"
+        :value="scores.seo !== null ? `${scores.seo}` : '--'"
+        description="Search engine optimization"
+        :is-dark-mode="isDarkMode"
       />
     </div>
   </div>
@@ -30,7 +50,7 @@
 
 <script setup>
 import { ref, watch, onMounted, nextTick } from 'vue'
-import ScoreCards from '../common/ScoreCards.vue'
+import MetricCard from '../common/MetricCard.vue'
 import {
   animateSlideDownEntry,
   animateSlideUpExit,
