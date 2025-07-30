@@ -8,6 +8,7 @@ export default defineConfig({
     vue(),
     tailwindcss()
   ],
+  assetsInclude: ['**/*.mp3'],
   server: {
     proxy: {
       // Proxy all /api requests to Vercel dev server

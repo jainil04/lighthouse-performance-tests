@@ -16,7 +16,7 @@
     <p ref="metricsDescription" :class="[
       'mb-4',
       isDarkMode ? 'text-gray-300' : 'text-gray-600'
-    ]">Your performance testing results will appear here.</p>
+    ]">This is an average of the performance metrics across all runs.</p>
 
     <!-- Metric Cards -->
     <div ref="scoreCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

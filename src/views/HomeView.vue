@@ -1,4 +1,5 @@
 <script setup>
+import { watch } from 'vue'
 import { ref, inject, computed } from 'vue'
 import WelcomeSection from '../components/ui/sections/WelcomeSection.vue'
 import AuditProgress from '../components/ui/common/AuditProgress.vue'
@@ -7,6 +8,8 @@ import AuditResults from '../components/ui/sections/AuditResults.vue'
 import AverageMetricsChart from '../components/ui/common/AverageMetricsChart.vue'
 import Footer from '../components/ui/common/Footer.vue'
 import { useLighthouseAudit } from '../composables/useLighthouseAudit.js'
+import pop from '../assets/pop.mp3' // Assuming this is a utility for animations or effects;
+import { useSound } from '../composables/useSound.js'
 
 const urlValue = ref('')
 
@@ -15,6 +18,8 @@ const currentDevice = inject('currentDevice', ref('desktop'))
 const currentThrottle = inject('currentThrottle', ref('none'))
 const currentRuns = inject('currentRuns', ref(1))
 const currentAuditView = inject('currentAuditView', ref('standard'))
+const { play: playOn } = useSound({ src: pop, volume: 0.5 })
+
 
 // Use composable for audit logic
 const {
@@ -79,6 +84,14 @@ const metricsForChart = computed(() => {
   });
   return [{ run: 'Avg', values: avgValues }];
 });
+
+
+// Play pop sound when progress reaches 100
+watch(progress, (newVal, oldVal) => {
+  if (newVal === 100 && oldVal !== 100) {
+    playOn()
+  }
+})
 </script>
 
 <template>
