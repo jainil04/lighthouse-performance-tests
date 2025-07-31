@@ -31,6 +31,15 @@
         </div>
       </div>
 
+      <AiSummary
+        v-if="uploadedFiles.length > 1"
+        :scores="{}"
+        :all-runs-data="uploadedFiles"
+        :opportunities="{}"
+        :compareTables="true"
+        :is-dark-mode="isDarkMode"
+      />
+
       <!-- Tables Section -->
       <div v-if="uploadedFiles.length > 0" class="space-y-8">
         <div
@@ -109,6 +118,7 @@ import FileUploadComponent from '../components/ui/forms/FileUploadComponent.vue'
 import DataTableComponent from '../components/ui/common/DataTableComponent.vue'
 import Button from 'primevue/button'
 import Badge from 'primevue/badge'
+import AiSummary from '../components/ui/common/AiSummary.vue'
 
 // Get dark mode from parent layout
 const isDarkMode = inject('isDarkMode', ref(false))
