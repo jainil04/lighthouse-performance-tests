@@ -23,7 +23,7 @@ export default async function handler(req, res) {
 }
 
 // Centralized OpenAI Chat completion
-async function openaiChat(messages, { model = "gpt-3.5-turbo", max_tokens = 1500, temperature = 0.7 } = {}) {
+async function openaiChat(messages, { model = "gpt-4.1", max_tokens = 1500, temperature = 0.7 } = {}) {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
