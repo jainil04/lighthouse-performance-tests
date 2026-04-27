@@ -1,6 +1,5 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
-import fs from 'fs';
 
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
