@@ -204,14 +204,9 @@ The one real tradeoff: SSE is unidirectional. If you wanted to cancel an in-prog
 
 ## 7. What's NOT here yet
 
-- **No persistence.** Audit results are held in browser memory (`useLighthouseAudit.js` refs). Closing the tab loses everything. There's no database, no history, no saved results.
-- **No authentication.** Any visitor can run an audit. There are no user accounts, no sessions, no JWT. The API is open.
-- **No rate limiting.** Nothing prevents a single user from hammering the audit endpoint continuously.
-- **No background jobs.** Audits only run on-demand when a user clicks run. There's no scheduling, no cron, no BullMQ worker.
-- **No cancellation.** Once an audit starts, there's no way to stop it from the frontend. The SSE connection closes if the user navigates away, but the serverless function continues running until it finishes or times out.
-- **No multi-tenancy.** There's no concept of "your audits" vs. "someone else's audits."
+Audit results are held in browser memory only (no persistence), the API is open to any visitor (no auth), there is no rate limiting, no scheduled jobs, no audit cancellation, and no multi-tenancy. All are intentional v1 deferments.
 
-All of these are intentional deferments for v1. See `FUTURE.md` for the roadmap and `docs/decisions/` for the ADRs that explain the trade-offs.
+For the full phased plan — what's next, in what order, and what's deliberately out of scope — see [`docs/ROADMAP.md`](ROADMAP.md).
 
 ---
 
