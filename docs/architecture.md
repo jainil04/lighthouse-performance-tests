@@ -139,7 +139,7 @@ On `lighthouse()` resolving, `api/lighthouse.js` extracts from the raw `lhr` (Li
 Each completed run emits `{type: 'run-complete', currentRun, totalRuns, runResult: {scores, metrics, opportunities, diagnostics}}`. The frontend appends one row to `allRunsData` and updates live score displays. Note: `fullReport` is **not** in `run-complete` — it only arrives in `complete`.
 
 **11. Averaging (multi-run only)**
-After all runs complete, `calculateAverages(runResults)` computes arithmetic means for scores and metrics across all runs. **Opportunities and diagnostics are not averaged** — they are taken from run 1 only.
+After all runs complete, `calculateAverages(runResults)` computes arithmetic means for scores and metrics across all runs. **Opportunities and diagnostics are not averaged** — they are taken from run 1 only (see [ADR 005](decisions/005-multi-run-aggregation-strategy.md) for the asymmetric aggregation behavior and deferred alternatives).
 
 **12. `complete` event closes the stream**
 Single run: `{type: 'complete', data: {run, summary}}`. Multi-run: `{type: 'complete', data: {runs[], averages, summary}}`. `res.end()` is called. `browser.close()` runs in the `finally` block regardless of success or failure.
@@ -239,10 +239,10 @@ All of these are intentional deferments for v1. See `FUTURE.md` for the roadmap 
 
 These were found during the architecture audit and do not yet match the code:
 
-1. **`vercel.json` sets `LC_ALL=C`** in its `env` block, but `api/lighthouse.js` lines 8–11 immediately overwrite it with `en_US.UTF-8` at module load time. The code wins. The `vercel.json` `env` value is misleading but harmless.
+1. ~~**`vercel.json` sets `LC_ALL=C`** in its `env` block, but `api/lighthouse.js` overwritten it at module load time.~~ **Fixed** — `LC_ALL` removed from `vercel.json`; code-level setter is the single source of truth.
 
-2. **`/api/lighthouse/audit/stream` route in `vercel.json`** is never called by the current frontend. The frontend calls `POST /api/lighthouse`, which is handled by the catch-all route `"/api/(.*)" → "/api/$1.js"`. The explicit `audit/stream` route is a legacy alias — safe to remove.
+2. ~~**`/api/lighthouse/audit/stream` route in `vercel.json`** — legacy alias never called by the frontend.~~ **Fixed** — route removed; catch-all `"/api/(.*)"` handles all handlers.
 
-3. **`import fs from 'fs'` in `api/lighthouse.js:3`** is unused. Safe to remove.
+3. ~~**`import fs from 'fs'` in `api/lighthouse.js:3`** — unused import.~~ **Fixed** — import removed.
 
-4. **Multi-run opportunities and diagnostics are not averaged.** `calculateAverages()` in `api/lighthouse.js:414–415` takes both fields from `results[0]` only. Only `scores` and `metrics` are arithmetically averaged. This is an undocumented accuracy limitation: if run 1 happens to audit a slow cache response and run 2 is faster, the displayed opportunities reflect run 1's reality only.
+4. **Multi-run opportunities and diagnostics are not averaged.** `calculateAverages()` in `api/lighthouse.js` (lines 412–414) takes both fields from `results[0]` only. Only `scores` and `metrics` are arithmetically averaged. Documented and deferred in [ADR 005](decisions/005-multi-run-aggregation-strategy.md).
