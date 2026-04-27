@@ -1,4 +1,4 @@
-# ADR 002 — SSE over WebSockets for audit streaming
+# ADR 0002 — SSE over WebSockets for audit streaming
 
 ## Status
 Accepted

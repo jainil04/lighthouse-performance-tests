@@ -36,7 +36,7 @@ This is the canonical, living roadmap for Lighthouse Monitor. It tracks what's s
 - ✅ Hierarchical `CLAUDE.md` system — root + `api/`, `backend/`, `src/`, composables, components subdirectories
 - ✅ `docs/architecture.md` — system narrative, Mermaid topology diagram, SSE sequence diagram, bottleneck analysis, glossary
 - ✅ `docs/decisions/0001-dual-deployment-vercel-serverless-and-express.md` — dual-backend rationale, Chrome binary problem, BullMQ inflection point
-- ✅ `docs/decisions/005-multi-run-aggregation-strategy.md` — scores/metrics averaged across runs, opportunities taken from run 1 only; asymmetry documented and deferred (see ADR 005)
+- ✅ `docs/decisions/0005-multi-run-aggregation-strategy.md` — scores/metrics averaged across runs, opportunities taken from run 1 only; asymmetry documented and deferred (see ADR 0005)
 - ✅ `.claude/commands/` — `add-endpoint.md`, `add-vue-component.md`, `review-pr.md`
 
 **Cleanup**
@@ -148,8 +148,8 @@ This is the canonical, living roadmap for Lighthouse Monitor. It tracks what's s
 - ❌ **Microservices split** — a well-structured monolith beats a fragmented system at this scale; split when a seam genuinely justifies it
 - ❌ **Kubernetes deployment** — Vercel + Fly.io / Railway is the right hosting tier for this project's lifetime
 - ❌ **Custom-trained AI models** — calling OpenAI is sufficient; fine-tuning would be a months-long detour for marginal gain
-- ❌ **WebSockets** — SSE is unidirectional and HTTP-native; the right tool for this use case (see `docs/decisions/002-sse-not-websockets.md`)
-- ❌ **Pinia / Vuex** — `provide`/`inject` in `App.vue` is sufficient while the state surface is small (see `docs/decisions/004-no-state-manager.md`)
+- ❌ **WebSockets** — SSE is unidirectional and HTTP-native; the right tool for this use case (see `docs/decisions/0002-sse-not-websockets.md`)
+- ❌ **Pinia / Vuex** — `provide`/`inject` in `App.vue` is sufficient while the state surface is small (see `docs/decisions/0004-no-state-manager.md`)
 - ❌ **ESLint / Prettier** — add when team size or contributor count justifies it; not a solo-project priority
 
 ---

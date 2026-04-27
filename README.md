@@ -61,7 +61,7 @@ Phase 0 (documentation and cleanup) is complete. Phase 1 (Postgres persistence +
 Major technical decisions are documented as ADRs in [`docs/decisions/`](docs/decisions/):
 
 - [0001](docs/decisions/0001-dual-deployment-vercel-serverless-and-express.md) — dual-mode deployment
-- [002](docs/decisions/002-sse-not-websockets.md) — SSE over WebSockets
-- [003](docs/decisions/003-no-auth-v1.md) — no auth in v1
-- [004](docs/decisions/004-no-state-manager.md) — `provide`/`inject` over Pinia
-- [005](docs/decisions/005-multi-run-aggregation-strategy.md) — multi-run aggregation asymmetry
+- [0002](docs/decisions/0002-sse-not-websockets.md) — SSE over WebSockets
+- [0003](docs/decisions/0003-no-auth-v1.md) — no auth in v1
+- [0004](docs/decisions/0004-no-state-manager.md) — `provide`/`inject` over Pinia
+- [0005](docs/decisions/0005-multi-run-aggregation-strategy.md) — multi-run aggregation asymmetry

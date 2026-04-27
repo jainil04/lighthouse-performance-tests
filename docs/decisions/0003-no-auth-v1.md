@@ -1,4 +1,4 @@
-# ADR 003 — No authentication in v1
+# ADR 0003 — No authentication in v1
 
 ## Status
 Accepted (deferred)

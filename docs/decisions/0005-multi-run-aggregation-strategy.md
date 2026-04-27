@@ -1,4 +1,4 @@
-# ADR 005 — Multi-run aggregation strategy
+# ADR 0005 — Multi-run aggregation strategy
 
 ## Status
 Proposed

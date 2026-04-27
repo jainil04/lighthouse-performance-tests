@@ -17,7 +17,7 @@ Planned features for the next 6 weeks. Read this before designing any new backen
 ### BullMQ scheduled jobs
 - Users schedule recurring audits (e.g. "run every day at 9am")
 - Implies: Redis instance, a BullMQ worker process, a job queue API (`POST /api/jobs`)
-- **Critical constraint**: BullMQ workers are persistent processes — they cannot run inside Vercel serverless functions. This will require either a separate worker service (Railway/Render) or a full move of the backend to Express + a process manager. See `docs/decisions/001-vercel-dual-backend.md`.
+- **Critical constraint**: BullMQ workers are persistent processes — they cannot run inside Vercel serverless functions. This will require either a separate worker service (Railway/Render) or a full move of the backend to Express + a process manager. See `docs/decisions/0001-dual-deployment-vercel-serverless-and-express.md`.
 
 ### User audit history UI
 - New view (`/history`) showing past runs with score trends over time
@@ -25,7 +25,7 @@ Planned features for the next 6 weeks. Read this before designing any new backen
 
 ## Not planned (explicitly deferred)
 
-- WebSockets (SSE is sufficient — see `docs/decisions/002-sse-not-websockets.md`)
-- Pinia/Vuex (provide/inject is sufficient — see `docs/decisions/004-no-state-manager.md`)
+- WebSockets (SSE is sufficient — see `docs/decisions/0002-sse-not-websockets.md`)
+- Pinia/Vuex (provide/inject is sufficient — see `docs/decisions/0004-no-state-manager.md`)
 - ESLint/Prettier (add only when team size justifies it)
 - Unit/integration tests (add before auth/DB work begins)

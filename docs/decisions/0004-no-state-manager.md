@@ -1,4 +1,4 @@
-# ADR 004 — provide/inject instead of Pinia
+# ADR 0004 — provide/inject instead of Pinia
 
 ## Status
 Accepted
