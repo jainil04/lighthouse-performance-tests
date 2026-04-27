@@ -6,11 +6,9 @@ import AuditProgress from '../components/ui/common/AuditProgress.vue'
 import PerformanceMetrics from '../components/ui/sections/PerformanceMetrics.vue'
 import AuditResults from '../components/ui/sections/AuditResults.vue'
 import AverageMetricsChart from '../components/ui/common/AverageMetricsChart.vue'
-import Footer from '../components/ui/common/Footer.vue'
 import { useLighthouseAudit } from '../composables/useLighthouseAudit.js'
-import pop from '../assets/pop.mp3' // Assuming this is a utility for animations or effects;
+import pop from '../assets/pop.mp3'
 import { useSound } from '../composables/useSound.js'
-// import AiSummary from '../components/ui/common/AiSummary.vue'
 
 const urlValue = ref('')
 
@@ -156,19 +154,5 @@ watch(progress, (newVal, oldVal) => {
       :is-dark-mode="isDarkMode"
     />
 
-    <!-- AI summary -->
-     <!-- <AiSummary
-      v-if="auditResults"
-      :scores="scores"
-      :all-runs-data="allRunsData"
-      :opportunities="opportunities"
-      :is-dark-mode="isDarkMode"
-    /> -->
-
-    <!-- System Status Footer -->
-    <Footer
-      v-if="false"
-      :is-dark-mode="isDarkMode"
-    />
   </div>
 </template>
