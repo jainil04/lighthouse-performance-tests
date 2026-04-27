@@ -34,6 +34,7 @@ const {
   detailedMetrics,
   opportunities,
   diagnostics,
+  fullReport,
   allRunsData,
   runAudit
 } = useLighthouseAudit()
@@ -151,6 +152,7 @@ watch(progress, (newVal, oldVal) => {
       :detailed-metrics="detailedMetrics"
       :opportunities="opportunities"
       :diagnostics="diagnostics"
+      :full-report="fullReport"
       :is-dark-mode="isDarkMode"
     />
 

@@ -23,6 +23,7 @@ export function useLighthouseAudit() {
   const detailedMetrics = ref({})
   const opportunities = ref({})
   const diagnostics = ref({})
+  const fullReport = ref(null)
   const allRunsData = ref([])
 
   const calculateProgress = (currentRunProgress, currentRun, total) => {
@@ -138,6 +139,9 @@ export function useLighthouseAudit() {
             if (data.data.run.diagnostics) {
               diagnostics.value = { ...data.data.run.diagnostics }
             }
+            if (data.data.run.fullReport) {
+              fullReport.value = data.data.run.fullReport
+            }
           } else if (data.data.averages && data.data.averages.scores) {
             // Multiple runs - use averages
             scores.value = { ...data.data.averages.scores }
@@ -150,6 +154,9 @@ export function useLighthouseAudit() {
             }
             if (data.data.averages.diagnostics) {
               diagnostics.value = { ...data.data.averages.diagnostics }
+            }
+            if (data.data.runs?.[0]?.fullReport) {
+              fullReport.value = data.data.runs[0].fullReport
             }
           }
         }
@@ -185,6 +192,7 @@ export function useLighthouseAudit() {
     detailedMetrics.value = {}
     opportunities.value = {}
     diagnostics.value = {}
+    fullReport.value = null
     allRunsData.value = []
 
     console.log('Starting Lighthouse audit:', auditConfig)
@@ -214,6 +222,7 @@ export function useLighthouseAudit() {
     detailedMetrics,
     opportunities,
     diagnostics,
+    fullReport,
     allRunsData,
 
     // Methods

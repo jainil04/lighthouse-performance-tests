@@ -29,12 +29,10 @@
 
     <!-- Full View - Comprehensive Report -->
     <div v-else-if="currentAuditView === 'full'" ref="fullViewContainer">
-      <div v-if="auditResults || Object.keys(detailedMetrics).length > 0" ref="detailedContent">
-        <DetailedMetrics
-          :metrics="detailedMetrics"
-          :opportunities="opportunities"
-          :diagnostics="diagnostics"
-          :isDarkMode="isDarkMode"
+      <div v-if="fullReport" ref="detailedContent">
+        <FullReportView
+          :full-report="fullReport"
+          :is-dark-mode="isDarkMode"
         />
       </div>
       <div v-else ref="emptyStateContent" class="text-center py-8">
@@ -60,6 +58,7 @@
 <script setup>
 import { ref, watch, onMounted, nextTick, computed } from 'vue'
 import AuditTable from '../common/AuditTable.vue'
+import FullReportView from '../common/FullReportView.vue'
 import {
   animateSlideDownEntry,
   animateSlideUpExit,
@@ -77,6 +76,7 @@ const props = defineProps({
   detailedMetrics: Object,
   opportunities: Object,
   diagnostics: Object,
+  fullReport: Object,
   isDarkMode: Boolean
 })
 
@@ -98,7 +98,8 @@ const emptyStateDescription = ref(null)
 const hasAuditData = computed(() => {
   return (props.allRunsData && props.allRunsData.length > 0) ||
          (props.auditResults && Object.keys(props.auditResults).length > 0) ||
-         (props.detailedMetrics && Object.keys(props.detailedMetrics).length > 0)
+         (props.detailedMetrics && Object.keys(props.detailedMetrics).length > 0) ||
+         !!props.fullReport
 })
 
 // Animation functions using utilities
