@@ -64,4 +64,4 @@ OPENAI_API_KEY    # Required for /api/ai-summary (GPT-4.1)
 
 - Architecture narrative + data flow diagram: `docs/architecture.md`
 - Decision records (SSE vs WebSockets, dual backend, no auth, no state manager): `docs/decisions/`
-- Planned features (Postgres, JWT auth, BullMQ, user history): `FUTURE.md` — **read before designing any new backend system**
+- Planned features + architectural constraints (Postgres, JWT auth, BullMQ, user history): `docs/ROADMAP.md` — **read the Design Constraints section at the top before adding any new backend feature**

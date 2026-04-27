@@ -48,8 +48,8 @@ No code changes now.
 ## Open questions
 - What does the user actually want from a multi-run audit? Median? Worst case? Most consistent issues?
 - Should the `complete` event's data shape be extended to surface the choice — e.g., return per-run results alongside aggregated, so the frontend can decide what to display?
-- If user history is added (see `FUTURE.md`), should historical opportunity tracking use the same run-1 approach, or is that the forcing function to implement option C?
+- If user history is added (see [ROADMAP Phase 1](../ROADMAP.md)), should historical opportunity tracking use the same run-1 approach, or is that the forcing function to implement option C?
 
 ## References
 - `api/lighthouse.js`, `calculateAverages()`, lines 377–422
-- `FUTURE.md` — user history and trend visualization planned features
+- `docs/ROADMAP.md` — user history and trend visualization (Phase 1)

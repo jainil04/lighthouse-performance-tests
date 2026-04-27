@@ -14,6 +14,18 @@ This is the canonical, living roadmap for Lighthouse Monitor. It tracks what's s
 
 ---
 
+## Design constraints — read before adding features
+
+These are architectural facts that must inform any new backend work. They are not preferences — violating them creates integration failures that are silent until production.
+
+- **BullMQ workers cannot run inside Vercel serverless functions.** Workers are persistent processes; serverless functions terminate after `res.end()`. Scheduled jobs require a separate always-on service (the Express backend deployed to Railway/Render, or a dedicated worker process). → [ADR 0001](decisions/0001-dual-deployment-vercel-serverless-and-express.md)
+
+- **Postgres connections in `api/` must use a serverless-compatible driver.** Standard `pg` connection pools don't survive cold starts. Use the Neon serverless driver (`@neondatabase/serverless`) or pgBouncer in transaction mode. A regular pool will exhaust connections silently under load.
+
+- **JWT middleware must be added to both `api/` and `backend/` — not one or the other.** The parity rule requires both backends to enforce identical auth. `streamLighthouseAudit()` in `src/utils/lighthouseApi.js` must forward the `Authorization` header; `App.vue` must carry auth state via `provide`. → [ADR 0001](decisions/0001-dual-deployment-vercel-serverless-and-express.md)
+
+---
+
 ## Status legend
 
 | Marker | Meaning |
@@ -162,6 +174,7 @@ These apply continuously across all phases, not gated to any single one:
 - Update `docs/architecture.md` when the system shape changes — new services, new data flows, new bottlenecks
 - Update the relevant `CLAUDE.md` file when a new convention establishes (new composable pattern, new API handler pattern, new component layer rule)
 - Keep `README.md` in sync with what's actually shipped — no aspirational claims in the README
+- Tests accompany feature work. New routes get integration tests; new business logic gets unit tests. Phase 1 (auth + DB) is the hard floor — no auth/DB code lands without tests covering it. Earlier phases can be lighter on coverage, but no phase ships without tests of its critical paths.
 
 ---
 

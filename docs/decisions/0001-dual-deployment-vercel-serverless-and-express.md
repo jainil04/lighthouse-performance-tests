@@ -45,7 +45,7 @@ Deploy only `/api/`. Delete `/backend/`. One codebase, one deployment model.
 
 Rejected because:
 - The 60-second timeout is already fragile for multi-run audits. A 5-run audit on a slow URL (20s/run) hits it exactly; any network variance tips it over. There's no way to increase this limit on the Vercel hobby tier.
-- BullMQ scheduled jobs (planned — see `FUTURE.md`) require a persistent Redis-connected worker process that runs indefinitely. Vercel serverless functions terminate the moment `res.end()` is called. There is no way to make this work without a separate always-on service anyway.
+- BullMQ scheduled jobs (planned — see [ROADMAP Phase 2](../ROADMAP.md)) require a persistent Redis-connected worker process that runs indefinitely. Vercel serverless functions terminate the moment `res.end()` is called. There is no way to make this work without a separate always-on service anyway.
 - Deployers who don't use Vercel have no path forward.
 
 ### B) Express only
@@ -98,7 +98,7 @@ Rejected for v1 because:
 
 ## Open questions / future revisits
 
-- **BullMQ inflection point.** When scheduled jobs ship, a persistent worker process is required. Vercel serverless cannot host it. At that point: does the Express backend become the primary deployment, with Vercel reduced to serving the static frontend + on-demand audit API? Or is a split architecture more appropriate (Vercel for on-demand, Railway/Render for the worker)? This decision should be made before BullMQ work begins, not during it. See `FUTURE.md`.
+- **BullMQ inflection point.** When scheduled jobs ship, a persistent worker process is required. Vercel serverless cannot host it. At that point: does the Express backend become the primary deployment, with Vercel reduced to serving the static frontend + on-demand audit API? Or is a split architecture more appropriate (Vercel for on-demand, Railway/Render for the worker)? This decision should be made before BullMQ work begins, not during it. See [ROADMAP Phase 2](../ROADMAP.md).
 
 - **Shared utils expansion.** The `api/utils/` modules (`getLighthouseConfig.js`, `getLaunchConfig.js`) could be extracted to a shared top-level `lib/` or `shared/` directory and imported by both backends. This would close the parity gap for config logic. Not done in v1 because the path resolution differs between environments, but it's viable.
 
@@ -115,4 +115,4 @@ Rejected for v1 because:
 - `backend/server.js` — Express setup, port 3001
 - `backend/services/lighthouseService.js` — `chrome-launcher`, `runLighthouseAuditStream()`, `calculateAverages()` (duplicated)
 - `docs/architecture.md` Section 4 — "Why two backends?"
-- `FUTURE.md` — BullMQ scheduled jobs planned feature
+- `docs/ROADMAP.md` — BullMQ scheduled jobs (Phase 2)

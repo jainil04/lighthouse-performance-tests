@@ -17,4 +17,4 @@ Ship v1 without authentication.
 ## Consequences
 - **Positive**: Faster iteration; no auth bugs; simpler API handlers
 - **Negative**: No rate limiting — the API is open to abuse; Lighthouse + Chrome are expensive per-invocation
-- **Planned**: JWT auth + Postgres users table is on the roadmap (see `FUTURE.md`). When added: `api/` handlers gain a JWT middleware layer; `backend/` gains the same middleware to maintain parity. Auth headers need to flow through `streamLighthouseAudit()` in `lighthouseApi.js`.
+- **Planned**: JWT auth + Postgres users table is on the roadmap (see [ROADMAP Phase 1](../ROADMAP.md)). When added: `api/` handlers gain a JWT middleware layer; `backend/` gains the same middleware to maintain parity. Auth headers need to flow through `streamLighthouseAudit()` in `lighthouseApi.js`.

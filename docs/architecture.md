@@ -170,7 +170,7 @@ The parity contract: both backends must emit the same SSE event types with ident
 
 **The upcoming inflection point**
 
-BullMQ scheduled jobs (planned — see `FUTURE.md`) require a persistent Redis-connected worker process. Vercel serverless functions cannot run persistent workers — they terminate after `res.end()`. When that feature lands, the architecture needs to split: Vercel handles on-demand audits; a separate persistent service (likely the Express backend) handles scheduled job workers. This is the clearest reason the Express backend is not throwaway code.
+BullMQ scheduled jobs (planned — see [ROADMAP Phase 2](ROADMAP.md)) require a persistent Redis-connected worker process. Vercel serverless functions cannot run persistent workers — they terminate after `res.end()`. When that feature lands, the architecture needs to split: Vercel handles on-demand audits; a separate persistent service (likely the Express backend) handles scheduled job workers. This is the clearest reason the Express backend is not throwaway code.
 
 ---
 
