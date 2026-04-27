@@ -54,7 +54,8 @@ These are architectural facts that must inform any new backend work. They are no
 **Cleanup**
 - ✅ Removed `LC_ALL=C` from `vercel.json` (code-level setter is the single source of truth)
 - ✅ Removed dead `/audit/stream` legacy route from `vercel.json`
-- ✅ Removed unused `import fs from 'fs'` in `api/lighthouse.js` and `api/audit.js`
+- ✅ Removed unused `import fs from 'fs'` in `api/lighthouse.js`
+- ✅ Deleted dead serverless functions: `api/audit.js` (superseded by `lighthouse.js`), `api/health.js`, `api/status.js` — reduces deployed function count from 14 → 11, under Vercel Hobby plan's 12-function limit
 
 **Definition of done:** ✅ Phase 0 is complete. All docs are written, inconsistencies are resolved, and the codebase matches its documentation.
 
