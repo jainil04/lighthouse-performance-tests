@@ -1,7 +1,7 @@
 # ADR 001 — Vercel serverless + Express dual backend
 
 ## Status
-Accepted
+Superseded by [ADR 0001](0001-dual-deployment-vercel-serverless-and-express.md)
 
 ## Context
 Lighthouse requires a headless Chrome instance. This can be run in a serverless function (with a pre-built Chromium binary) or in a persistent Express server (using the local system Chrome). Both approaches have different tradeoffs for cost, cold start latency, and deployment complexity.
