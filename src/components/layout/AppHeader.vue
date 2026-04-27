@@ -1,14 +1,14 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { inject, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import ThemeToggler from './ThemeToggler.vue'
 import Button from 'primevue/button'
 import Menubar from 'primevue/menubar'
 
 const router = useRouter()
-const route = useRoute()
+const logout = inject('logout')
 
-defineProps({
+const props = defineProps({
   logoSrc: {
     type: String,
     default: '/vite.svg'
@@ -24,34 +24,26 @@ defineProps({
   isDarkMode: {
     type: Boolean,
     default: false
+  },
+  user: {
+    type: Object,
+    default: null
   }
 })
 
 defineEmits(['toggle-sidebar', 'theme-change'])
 
-const menuItems = ref([
-  {
-    label: 'Home',
-    icon: 'pi pi-home',
-    command: () => {
-      router.push('/')
-    }
-  },
-  {
-    label: 'Compare Results',
-    icon: 'pi pi-upload',
-    command: () => {
-      router.push('/upload')
-    }
-  },
-  {
-    label: 'Documentation',
-    icon: 'pi pi-book',
-    command: () => {
-      router.push('/documentation')
-    }
-  },
-])
+const menuItems = computed(() => {
+  const items = [
+    { label: 'Home', icon: 'pi pi-home', command: () => router.push('/') },
+    { label: 'Compare Results', icon: 'pi pi-upload', command: () => router.push('/upload') },
+    { label: 'Documentation', icon: 'pi pi-book', command: () => router.push('/documentation') },
+  ]
+  if (props.user) {
+    items.push({ label: 'History', icon: 'pi pi-history', command: () => router.push('/history') })
+  }
+  return items
+})
 </script>
 
 <template>
@@ -81,8 +73,26 @@ const menuItems = ref([
       />
     </div>
 
-    <!-- Right side - Theme toggler -->
-    <div class="hidden md:flex items-center">
+    <!-- Right side - Auth + Theme toggler -->
+    <div class="hidden md:flex items-center gap-2">
+      <template v-if="user">
+        <span :class="['text-sm', isDarkMode ? 'text-gray-300' : 'text-gray-600']">{{ user.email }}</span>
+        <Button
+          label="Log out"
+          severity="secondary"
+          size="small"
+          text
+          @click="logout"
+        />
+      </template>
+      <Button
+        v-else
+        label="Login"
+        severity="secondary"
+        size="small"
+        outlined
+        @click="router.push('/auth')"
+      />
       <ThemeToggler
         :is-dark="isDarkMode"
         @theme-change="$emit('theme-change', $event)"

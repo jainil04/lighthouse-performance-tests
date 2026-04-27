@@ -1,7 +1,10 @@
 import { ref } from 'vue'
 import { streamLighthouseAudit } from '../utils/lighthouseApi.js'
+import { useAuditNotification } from './useAuditNotification.js'
 
 export function useLighthouseAudit() {
+  const { visible: notificationVisible, show: showNotification, dismiss: dismissNotification } = useAuditNotification()
+
   const isRunning = ref(false)
   const progress = ref(0)
   const currentStage = ref('')
@@ -123,6 +126,7 @@ export function useLighthouseAudit() {
         console.log('Audit completed!', data.data)
         auditResults.value = data.data
         progress.value = 100 // Ensure progress is 100% when completely done
+        showNotification()
 
         // Update final scores and metrics
         if (data.data) {
@@ -224,6 +228,10 @@ export function useLighthouseAudit() {
     diagnostics,
     fullReport,
     allRunsData,
+
+    // Notification
+    notificationVisible,
+    dismissNotification,
 
     // Methods
     runAudit,

@@ -6,14 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:migrate": "node --env-file=.env node_modules/.bin/node-pg-migrate up",
+    "db:migrate:down": "node --env-file=.env node_modules/.bin/node-pg-migrate down",
+    "db:migrate:create": "node --env-file=.env node_modules/.bin/node-pg-migrate create --migration-file-language sql"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@primeuix/themes": "^1.2.1",
     "@sparticuz/chromium": "^138.0.2",
     "@sparticuz/chromium-min": "^119.0.0",
     "@tailwindcss/vite": "^4.1.11",
     "axe-core": "^4.10.3",
+    "bcrypt": "^6.0.0",
     "chart.js": "^4.5.0",
     "csp_evaluator": "^1.1.5",
     "gsap": "^3.13.0",
@@ -21,6 +26,7 @@
     "image-ssim": "^0.2.0",
     "jpeg-js": "^0.4.4",
     "js-library-detector": "^6.7.0",
+    "jsonwebtoken": "^9.0.3",
     "lighthouse": "^12.8.0",
     "metaviewport-parser": "^0.3.0",
     "parse-cache-control": "^1.0.1",
@@ -38,6 +44,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
+    "node-pg-migrate": "^8.0.4",
     "vite": "^7.0.4"
   }
 }

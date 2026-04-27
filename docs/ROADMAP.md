@@ -60,29 +60,38 @@ These are architectural facts that must inform any new backend work. They are no
 
 ---
 
-### Phase 1 — Persistence + Identity (~2 weeks)
+### Phase 1 — Persistence + Identity ✅ Complete (2026-04-27)
 
 *Purpose: turn this from a stateless, tab-scoped tool into a real full-stack application with users and durable audit history. This is the phase that makes everything else possible.*
 
 **Data layer**
-- 📋 Postgres database — Neon free tier (serverless-compatible driver; no pgBouncer needed at this scale)
-- 📋 Schema: `users`, `targets` (URLs under monitoring), `runs` (one row per audit execution), `metrics` (one row per Core Web Vital per run), `run_artifacts` (full Lighthouse JSON for full-report view)
-- 📋 Migration tooling — `node-pg-migrate` or Prisma migrations; migration files committed alongside schema changes
+- ✅ Postgres database — Neon free tier (`@neondatabase/serverless`; HTTP-based driver, no pgBouncer needed)
+- ✅ Schema: `users`, `targets` (URLs under monitoring), `runs` (one row per audit execution), `metrics` (one row per metric per run), `run_artifacts` (full Lighthouse JSON for full-report view)
+- ✅ Migration tooling — `node-pg-migrate`; migration files in `migrations/`; scripts: `npm run db:migrate`, `npm run db:migrate:down`, `npm run db:migrate:create`
 
 **API**
-- 📋 `POST /api/auth/signup` — email + password; bcrypt hashing; returns JWT
-- 📋 `POST /api/auth/login` — verifies credentials; issues access + refresh tokens
-- 📋 JWT middleware — validates `Authorization: Bearer <token>` on protected routes in both `api/` and `backend/`
-- 📋 `POST /api/lighthouse` — existing handler wired to persist each run to `runs` + `metrics` tables for authenticated users
-- 📋 `GET /api/history` — paginated audit history for the authenticated user, filterable by URL / date range / score range
+- ✅ `POST /api/auth/signup` — email + password; bcrypt hashing (cost 10); returns JWT (7-day access token)
+- ✅ `POST /api/auth/login` — verifies credentials; returns JWT (7-day access token; no refresh token — deferred)
+- ✅ `GET /api/auth/check-email` — returns `{exists: boolean}`; used by the three-step auth UI to determine login vs. signup flow
+- ✅ JWT middleware (`api/lib/auth.js` → `verifyToken()`) — validates `Authorization: Bearer <token>`; used in `api/lighthouse.js` (optional) and `api/history.js` (required). *Note: `/backend/` Express does not have JWT middleware — parity gap accepted while Express is not the primary deployment.*
+- ✅ `POST /api/lighthouse` — wired to persist each run to `runs` + `metrics` tables for authenticated users; guests run normally with no persistence (see [ADR 0007](decisions/0007-auth-optional.md))
+- ✅ `GET /api/history` — paginated audit history for the authenticated user, filterable by URL; returns scores + Core Web Vitals per run
 
 **Frontend**
-- 📋 Login / signup views + auth state in `App.vue` (provided via `inject`)
-- 📋 `lighthouseApi.js` forwards `Authorization` header on all audit requests
-- 📋 `/history` route + `HistoryView.vue` — paginated table of past audits with score badges
-- 📋 `useAuditHistory` composable — fetches and caches history; backs the history view
+- ✅ Login / signup views (`AuthView.vue`) — three-step flow: email → check-email → login or signup
+- ✅ Auth state in `App.vue` — `user`, `token`, `login()`, `logout()` provided via `inject` to all children
+- ✅ `lighthouseApi.js` forwards `Authorization` header when a token is present in `localStorage`
+- ✅ `/history` route + `HistoryView.vue` — paginated table of past audits with score badges and CWV threshold badges; URL filter
+- ✅ `useAuditHistory` composable — fetches and paginates history from `GET /api/history`; backs the history view
+- ✅ Router guards — `/history` redirects to `/auth` if not authenticated; `/auth` redirects to `/` if already authenticated
 
-**Definition of done:** A logged-in user can run an audit, close the tab, return to `/history`, and see the saved result — all wired through Postgres in production, deployed on Vercel + Neon.
+**Post-Phase-1 improvements**
+- ✅ `runs_count` saved to `runs` table equals N (user-requested count), not N+1 — accurate audit count in history
+- ✅ Warmup run discarding — always run N+1, discard first result; warms Chrome + DNS before real runs (see [ADR 0006](decisions/0006-warmup-run-discarding.md))
+- ✅ Full metrics persistence — 4 category scores + 6 Core Web Vitals (FCP, LCP, CLS, TBT, SI, TTI) saved per run; all displayed in history table
+- ✅ `useAuditNotification` composable — "Audit complete ✓" badge on audit completion; 2-second auto-dismiss using Page Visibility API (timer pauses while tab is hidden)
+
+**Definition of done:** ✅ A logged-in user can run an audit, close the tab, return to `/history`, and see the saved result — all wired through Neon Postgres in production, deployed on Vercel.
 
 ---
 

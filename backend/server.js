@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
 import lighthouseRoutes from './routes/lighthouse.js';
+import { verifyToken } from '../api/lib/auth.js';
 
 // Load environment variables
 dotenv.config();
@@ -24,8 +25,18 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Auth middleware — parity with api/lighthouse.js (see docs/architecture.md Design Constraints)
+function requireAuth(req, res, next) {
+  try {
+    req.user = verifyToken(req);
+    next();
+  } catch (err) {
+    res.status(err.status || 401).json({ error: err.message });
+  }
+}
+
 // Routes
-app.use('/api/lighthouse', lighthouseRoutes);
+app.use('/api/lighthouse', requireAuth, lighthouseRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

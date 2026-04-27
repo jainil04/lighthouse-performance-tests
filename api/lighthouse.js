@@ -2,6 +2,8 @@ import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
 import { getLaunchConfig } from './utils/getLaunchConfig.js';
 import { getLighthouseConfig } from './utils/getLighthouseConfig.js';
+import { verifyToken } from './lib/auth.js';
+import { sql } from './lib/db.js';
 
 // Force English locale to prevent missing locale file errors
 process.env.LC_ALL = 'en_US.UTF-8';
@@ -42,6 +44,18 @@ async function prepareBrowser(isProduction, onProgress) {
   });
 
   return { browser, wsEndpoint };
+}
+
+// Warmup run — result is discarded; warms up Chrome + Lighthouse before real runs.
+// No progress events, no run-complete event, not added to runResults or lhrObjects.
+async function runWarmupAudit({ url, device, wsEndpoint }) {
+  const lighthouseConfig = getLighthouseConfig(device);
+  const lighthouseOptions = {
+    port: new URL(wsEndpoint).port,
+    output: 'json',
+    logLevel: 'error'
+  };
+  await lighthouse(url, lighthouseOptions, lighthouseConfig);
 }
 
 // Run Lighthouse audit and handle progress simulation
@@ -113,13 +127,20 @@ function handleError({ onProgress, error, url, device, throttle, executionTime, 
 }
 
 export default async function handler(req, res) {
-  // console.log("*** request received ***", JSON.stringify(JSON.parse(req.body)));
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
       error: 'Method not allowed',
       message: 'Only POST requests are allowed'
     });
+  }
+
+  // Optional auth — authenticated users get DB persistence, guests don't
+  let userId = null;
+  try {
+    userId = verifyToken(req).userId;
+  } catch {
+    // No valid token — audit runs normally, results are not persisted
   }
 
   const { url, device = 'desktop', throttle = 'none', runs = 1, auditView = 'standard' } = req.body;
@@ -144,6 +165,11 @@ export default async function handler(req, res) {
   const startTime = Date.now();
   const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
   let browser;
+  // Hoisted so the finally block can persist results without them going out of scope
+  let runResults = [];
+  let lhrObjects = [];
+  let finalScores = null;
+  let finalMetrics = null;
 
   // Global progress tracking to ensure monotonic increase
   let globalProgress = 0;
@@ -175,13 +201,16 @@ export default async function handler(req, res) {
     browser = browserResult.browser;
     const wsEndpoint = browserResult.wsEndpoint;
 
-    globalProgress = Math.max(globalProgress, 25);
+    // Warmup run — consumes the 0–30% initialization phase silently.
+    // prepareBrowser already emitted up to 30%; this run warms up Chrome + Lighthouse
+    // and is excluded from results, averages, run-complete events, and DB persistence.
+    await runWarmupAudit({ url, device, wsEndpoint });
+    globalProgress = Math.max(globalProgress, 30);
 
-    // Multiple runs support
-    const runResults = [];
+    // Real runs: 30–100%, divided equally across N user-requested runs
+    const progressPerRun = 70 / runs;
     for (let i = 0; i < runs; i++) {
-      const progressPerRun = 70 / runs; // 70% total for all runs
-      const baseProgressForRun = 25 + (i * progressPerRun); // Start after browser setup
+      const baseProgressForRun = 30 + (i * progressPerRun);
       globalProgress = Math.max(globalProgress, baseProgressForRun);
 
       // Run Lighthouse audit
@@ -195,6 +224,7 @@ export default async function handler(req, res) {
         progressPerRun,
         baseProgress: baseProgressForRun
       });
+      lhrObjects.push(lhr);
       const executionTime = Date.now() - startTime;
 
       // Extract scores and key metrics
@@ -297,7 +327,7 @@ export default async function handler(req, res) {
           }
         })
       });
-      const runCompleteProgress = Math.round((i + 1) * progressPerRun);
+      const runCompleteProgress = Math.round(30 + (i + 1) * progressPerRun);
       console.log(`[PROGRESS] Completed run ${i + 1}/${runs} - Progress: ${runCompleteProgress}%`);
       onProgress({
         type: 'run-complete',
@@ -338,6 +368,8 @@ export default async function handler(req, res) {
 
     if (runs > 1) {
       const averages = calculateAverages(runResults);
+      finalScores = averages.scores;
+      finalMetrics = averages.metrics;
       globalProgress = 100;
       onProgress({
         type: 'complete',
@@ -348,6 +380,8 @@ export default async function handler(req, res) {
         }
       });
     } else {
+      finalScores = runResults[0].scores;
+      finalMetrics = runResults[0].metrics;
       globalProgress = 100;
       onProgress({
         type: 'complete',
@@ -356,6 +390,16 @@ export default async function handler(req, res) {
           summary
         }
       });
+    }
+
+    // Persist before res.end() — Vercel terminates the function once the response is sent,
+    // so any await in finally after res.end() is not guaranteed to complete.
+    if (userId && runResults.length > 0 && finalScores) {
+      try {
+        await persistAuditRun({ userId, url, device, runs, auditView, finalScores, finalMetrics, lhrObjects });
+      } catch (dbErr) {
+        console.error('[persist]', dbErr);
+      }
     }
 
     res.end();
@@ -419,4 +463,53 @@ function calculateAverages(results) {
     opportunities,
     diagnostics
   };
+}
+
+async function persistAuditRun({ userId, url, device, runs, auditView, finalScores, finalMetrics, lhrObjects }) {
+  // Upsert-style: find existing target for this user+url or create one
+  let [target] = await sql`SELECT id FROM targets WHERE user_id = ${userId} AND url = ${url}`;
+  if (!target) {
+    [target] = await sql`
+      INSERT INTO targets (user_id, url) VALUES (${userId}, ${url}) RETURNING id
+    `;
+  }
+
+  // Create run in pending state so we hold a run_id for FK children
+  const [run] = await sql`
+    INSERT INTO runs (target_id, user_id, device, status, runs_count)
+    VALUES (${target.id}, ${userId}, ${device}, 'pending', ${runs})
+    RETURNING id
+  `;
+
+  // Persist category scores (for history filtering) + the six Core Web Vitals
+  const metricsToInsert = [
+    { name: 'performance',    value: finalScores.performance,    unit: 'score' },
+    { name: 'accessibility',  value: finalScores.accessibility,  unit: 'score' },
+    { name: 'best-practices', value: finalScores.bestPractices,  unit: 'score' },
+    { name: 'seo',            value: finalScores.seo,            unit: 'score' },
+    { name: 'fcp', value: finalMetrics.firstContentfulPaint,   unit: 'ms' },
+    { name: 'lcp', value: finalMetrics.largestContentfulPaint, unit: 'ms' },
+    { name: 'cls', value: finalMetrics.cumulativeLayoutShift,  unit: '' },
+    { name: 'tbt', value: finalMetrics.totalBlockingTime,      unit: 'ms' },
+    { name: 'si',  value: finalMetrics.speedIndex,             unit: 'ms' },
+    { name: 'tti', value: finalMetrics.timeToInteractive,      unit: 'ms' },
+  ];
+  for (const m of metricsToInsert) {
+    await sql`
+      INSERT INTO metrics (run_id, name, value, unit)
+      VALUES (${run.id}, ${m.name}, ${m.value}, ${m.unit})
+    `;
+  }
+
+  // Store the full lhr only when the user requested a full audit view
+  if (auditView === 'full' && lhrObjects.length > 0) {
+    await sql`
+      INSERT INTO run_artifacts (run_id, lhr_json)
+      VALUES (${run.id}, ${lhrObjects[0]})
+    `;
+  }
+
+  await sql`
+    UPDATE runs SET status = 'complete', completed_at = NOW() WHERE id = ${run.id}
+  `;
 }

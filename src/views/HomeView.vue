@@ -34,6 +34,8 @@ const {
   diagnostics,
   fullReport,
   allRunsData,
+  notificationVisible,
+  dismissNotification,
   runAudit
 } = useLighthouseAudit()
 
@@ -95,6 +97,36 @@ watch(progress, (newVal, oldVal) => {
 </script>
 
 <template>
+  <Teleport to="body">
+    <Transition name="audit-toast">
+      <div
+        v-if="notificationVisible"
+        :class="[
+          'fixed top-4 right-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border',
+          isDarkMode
+            ? 'bg-green-900 border-green-700 text-green-200'
+            : 'bg-green-50 border-green-200 text-green-800'
+        ]"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="text-sm font-medium">Audit complete ✓</span>
+        <button
+          @click="dismissNotification"
+          :class="[
+            'ml-1 rounded p-0.5 transition-colors',
+            isDarkMode ? 'hover:bg-green-800 text-green-300' : 'hover:bg-green-100 text-green-600'
+          ]"
+          aria-label="Dismiss notification"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+          </svg>
+        </button>
+      </div>
+    </Transition>
+  </Teleport>
+
   <div class="space-y-6">
     <!-- Welcome Section -->
     <WelcomeSection
@@ -156,3 +188,15 @@ watch(progress, (newVal, oldVal) => {
 
   </div>
 </template>
+
+<style scoped>
+.audit-toast-enter-active,
+.audit-toast-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.audit-toast-enter-from,
+.audit-toast-leave-to {
+  opacity: 0;
+  transform: translateX(0.75rem);
+}
+</style>

@@ -14,17 +14,27 @@ Vue 3 SPA. Vite + Tailwind CSS 4 + PrimeVue 4.
 All shared state lives in `App.vue` as `ref` + `provide`. Current values provided:
 
 ```js
-provide('isDarkMode', isDarkMode)       // ref<Boolean>
-provide('toggleDarkMode', toggleDarkMode) // () => void
-provide('currentDevice', currentDevice)   // ref<'desktop'|'mobile'>
+provide('isDarkMode', isDarkMode)           // ref<Boolean>
+provide('toggleDarkMode', toggleDarkMode)   // () => void
+provide('currentDevice', currentDevice)     // ref<'desktop'|'mobile'>
 provide('currentThrottle', currentThrottle) // ref<'none'|...>
-provide('currentRuns', currentRuns)     // ref<Number 1-10>
+provide('currentRuns', currentRuns)         // ref<Number 1-10>
 provide('currentAuditView', currentAuditView) // ref<'standard'|'full'>
+
+// Auth state — set from localStorage on mount; updated by login/logout
+provide('user', user)     // ref<{id, email}|null>
+provide('token', token)   // ref<string|null>
+provide('login', login)   // (token, user) => void — saves to localStorage + updates refs
+provide('logout', logout) // () => void — clears localStorage, redirects to /auth
 ```
 
 To consume: `const isDarkMode = inject('isDarkMode', ref(false))`
 
 **Never create a Pinia store or Vuex module.** New shared state goes in `App.vue`.
+
+### Auth state pattern
+
+`login(token, user)` stores both to `localStorage` (`lh_token`, `lh_user`) and updates the refs. `logout()` clears localStorage and pushes to `/auth`. On `onMounted`, `App.vue` reads localStorage to restore session. Components that need to show/hide auth-gated UI inject `user` — if `user.value === null`, the visitor is a guest.
 
 ## Dark mode — two tracks
 
@@ -56,9 +66,15 @@ Do not use PrimeVue layout components (`Grid`, `Flex`). Do not use Tailwind for 
 /              → HomeView.vue          (main audit UI)
 /upload        → FileUploadView.vue    (Compare Results — note: UI calls it "Compare", route is /upload)
 /documentation → DocumentationView.vue
+/auth          → AuthView.vue          (login + signup — three-step: email → login or signup)
+/history       → HistoryView.vue       (paginated audit history — authenticated users only)
 ```
 
 `createWebHistory()` — HTML5 mode, no hash.
+
+**Router guards** (`src/router/index.js`):
+- `/auth` → redirects to `/` if `localStorage.lh_token` is set (already authenticated)
+- `/history` → redirects to `/auth` if `localStorage.lh_token` is not set (guest)
 
 ## Stale files — do not import
 
@@ -67,6 +83,39 @@ Do not use PrimeVue layout components (`Grid`, `Flex`). Do not use Tailwind for 
 ## No tooling
 
 No ESLint, Prettier, or Vitest. Don't scaffold them without instruction.
+
+## New views
+
+### `AuthView.vue`
+
+Three-step login/signup flow:
+1. **email step** — user enters email, `GET /api/auth/check-email` is called
+2. **login step** — shown if email exists; calls `POST /api/auth/login`
+3. **signup step** — shown if email is new; calls `POST /api/auth/signup`
+
+On success, calls `inject('login')(token, user)` and pushes to `/`. Uses PrimeVue `InputText` + `Button`. Transitions between steps with slide animations.
+
+### `HistoryView.vue`
+
+Paginated table of past audits for the authenticated user. Calls `GET /api/history` via `useAuditHistory`. Displays: URL, device, runs count, date, four category score badges, and six CWV metric badges (FCP, LCP, SI, CLS, TBT, TTI) color-coded against Google's official thresholds. URL filter via `InputText`. PrimeVue `DataTable` + `Paginator` + `Skeleton` for loading state. Uses `inject('isDarkMode')`.
+
+## New composables
+
+### `useAuditHistory.js`
+
+Fetches paginated audit history from `GET /api/history`. Reads token from `localStorage`. Used exclusively in `HistoryView.vue`.
+
+Returns: `{ runs, total, page, limit, loading, error, fetchHistory }`
+
+`fetchHistory({ page, limit, url })` — `url` is an optional exact-match filter.
+
+### `useAuditNotification.js`
+
+Shows an "Audit complete ✓" badge when a Lighthouse audit finishes. Encapsulates the Page Visibility API logic: the 2-second auto-dismiss timer only runs while the tab is visible; it pauses if the tab is hidden and resumes when the tab becomes visible again.
+
+Used inside `useLighthouseAudit.js` — `showNotification()` is called in the `complete` SSE event handler. Returns `{ visible, show, dismiss }` which are re-exported from `useLighthouseAudit`.
+
+Badge rendered in `HomeView.vue` via `<Teleport to="body">`. The `dismiss()` function removes the `visibilitychange` listener and clears the timer.
 
 ## Sub-directory docs
 

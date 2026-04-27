@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 
@@ -31,13 +32,22 @@ const props = defineProps({
   currentAuditView: {
     type: String,
     default: 'standard'
+  },
+  user: {
+    type: Object,
+    default: null
   }
 })
 
 const emit = defineEmits(['navigation-change', 'theme-change', 'device-change', 'throttle-change', 'runs-change', 'audit-view-change'])
 
+const route = useRoute()
+
 // Responsive sidebar state
 const sidebarOpen = ref(false)
+
+// Saved state so we can restore it when leaving /history
+let sidebarStateBeforeHistory = null
 
 // Check if we're on desktop
 const isDesktop = () => window.innerWidth >= 1024
@@ -47,8 +57,9 @@ const initializeSidebar = () => {
   sidebarOpen.value = isDesktop()
 }
 
-// Handle window resize
+// Handle window resize — don't reopen while on /history
 const handleResize = () => {
+  if (route.path === '/history') return
   if (isDesktop()) {
     sidebarOpen.value = true
   } else {
@@ -56,9 +67,25 @@ const handleResize = () => {
   }
 }
 
+// Auto-collapse on /history, restore on leave
+watch(() => route.path, (newPath, oldPath) => {
+  if (newPath === '/history') {
+    sidebarStateBeforeHistory = sidebarOpen.value
+    sidebarOpen.value = false
+  } else if (oldPath === '/history' && sidebarStateBeforeHistory !== null) {
+    sidebarOpen.value = sidebarStateBeforeHistory
+    sidebarStateBeforeHistory = null
+  }
+})
+
 onMounted(() => {
   initializeSidebar()
   window.addEventListener('resize', handleResize)
+  // Handle direct navigation / page refresh on /history
+  if (route.path === '/history') {
+    sidebarStateBeforeHistory = isDesktop()
+    sidebarOpen.value = false
+  }
 })
 
 onUnmounted(() => {
@@ -108,6 +135,7 @@ const handleCloseSidebar = () => {
       :logo-src="logoSrc"
       :title="headerTitle"
       :is-dark-mode="isDarkMode"
+      :user="user"
       @toggle-sidebar="toggleSidebar"
       @theme-change="handleThemeChange"
     />

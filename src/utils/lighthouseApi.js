@@ -2,11 +2,13 @@ export async function streamLighthouseAudit(auditConfig, onProgress) {
   try {
     console.log('Starting streaming audit with config:', auditConfig);
 
+    const headers = { 'Content-Type': 'application/json' }
+    const token = localStorage.getItem('lh_token')
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
     const response = await fetch("/api/lighthouse", {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(auditConfig)
     });
 

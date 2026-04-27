@@ -27,10 +27,12 @@ flowchart TD
     subgraph Production ["Vercel Platform (production)"]
         VFunc["api/lighthouse.js\nServerless Function\n60s / 1024MB"]
         VFunc2["api/ai-summary.js\nServerless Function"]
+        VFuncAuth["api/auth/*.js\nsignup / login / check-email"]
+        VFuncHistory["api/history.js\nGET — auth required"]
     end
 
     subgraph Alternative ["Alternative Deploy"]
-        Express["backend/server.js\nExpress :3001"]
+        Express["backend/server.js\nExpress :3001\n(no auth layer)"]
     end
 
     subgraph AuditEngine ["Audit Engine (inside serverless fn or Express)"]
@@ -40,17 +42,21 @@ flowchart TD
     end
 
     OpenAI["OpenAI GPT-4.1\napi/ai-summary.js"]
+    NeonDB[("Neon Postgres\n@neondatabase/serverless\nusers · targets · runs\nmetrics · run_artifacts")]
 
     User -->|"load app"| SPA
-    SPA -->|"POST /api/lighthouse\n{url, device, runs, auditView}"| Proxy
+    SPA -->|"POST /api/lighthouse\n{url, device, runs, auditView}\n+ optional Bearer token"| Proxy
     Proxy -->|dev: proxy to :3000| VFunc
     SPA -->|"SSE stream\ndata: {...}\\n\\n"| User
     VFunc --> Puppeteer
     Puppeteer -->|"launch + wsEndpoint"| Chrome
     Chrome -->|"CDP WebSocket"| LH
     LH -->|"lhr JSON"| VFunc
+    VFunc -->|"persist run + metrics\n(authenticated users only)"| NeonDB
     VFunc -->|"POST /api/ai-summary\n(from FileUploadView)"| VFunc2
     VFunc2 -->|"fetch"| OpenAI
+    VFuncAuth -->|"users table"| NeonDB
+    VFuncHistory -->|"runs + metrics JOIN"| NeonDB
     Express -.->|"same audit logic\nchrome-launcher instead"| Chrome
 ```
 
@@ -61,28 +67,46 @@ sequenceDiagram
     participant FE as Frontend<br/>(useLighthouseAudit.js)
     participant API as api/lighthouse.js
     participant CH as Chrome + Lighthouse
+    participant DB as Neon Postgres
 
-    FE->>API: POST /api/lighthouse {url, device, runs, auditView}
+    FE->>API: POST /api/lighthouse {url, device, runs, auditView}<br/>+ Authorization: Bearer <token> (optional)
+    Note over API: verifyToken() — sets userId if valid,<br/>null if missing/invalid (guest mode)
     API-->>FE: SSE headers (200, text/event-stream)
     API-->>FE: progress {stage: initialization, 0%}
     API->>CH: puppeteer.launch() → getLaunchConfig()
     API-->>FE: progress {stage: browser-setup, 10%}
     API-->>FE: progress {stage: browser-launch, 20%}
     API-->>FE: progress {stage: lighthouse-setup, 30%}
-    Note over API: globalProgress locked to ≥ 25%
 
-    loop For each run i = 0..N-1
+    Note over API,CH: Warmup run (silent) — warms Chrome + DNS + V8.<br/>Result discarded. No run-complete event emitted.<br/>globalProgress = 30%
+
+    API->>CH: lighthouse(url, {port}, config) [warmup]
+    CH-->>API: lhr [discarded]
+
+    loop For each real run i = 0..N-1
+        Note over API: baseProgress = 30 + i*(70/N)%
         API-->>FE: progress {stage: audit, baseProgress}
         API->>CH: lighthouse(url, {port}, config)
         Note over API: setInterval simulates progress<br/>+5-10% every 2s during audit
-        API-->>FE: progress {stage: audit-running, ~35-85%}
+        API-->>FE: progress {stage: audit-running, interpolated}
         CH-->>API: lhr (Lighthouse Result)
         API-->>FE: run-complete {scores, metrics, opps, diagnostics}
-        Note over API: 500ms delay before next run
+        Note over API: runCompleteProgress = 30 + (i+1)*(70/N)%<br/>500ms delay before next run
     end
 
     API-->>FE: progress {stage: finalizing, 95%}
     API-->>FE: complete {data: run|runs+averages}
+
+    opt userId != null (authenticated user)
+        API->>DB: INSERT INTO targets (upsert by url)
+        API->>DB: INSERT INTO runs (status: pending, runs_count: N)
+        API->>DB: INSERT INTO metrics (scores × 4, CWV × 6)
+        opt auditView === 'full'
+            API->>DB: INSERT INTO run_artifacts (lhr_json)
+        end
+        API->>DB: UPDATE runs SET status = 'complete'
+    end
+
     API->>CH: browser.close()
     API-->>FE: (stream ends, res.end())
 ```
@@ -104,9 +128,13 @@ When a user enters a URL and clicks Run Audit:
 ```
 POST /api/lighthouse
 Content-Type: application/json
+Authorization: Bearer <token>   ← omitted if no token in localStorage
 Body: {"url":"...","device":"desktop","throttle":"none","runs":1,"auditView":"standard"}
 ```
 Uses `fetch()` + `response.body.getReader()` — not `EventSource`, because `EventSource` only supports GET.
+
+**3b. JWT verification (optional, inside the handler)**
+`api/lighthouse.js` calls `verifyToken(req)` in a try/catch. If a valid `Authorization: Bearer <token>` header is present, `userId` is set to the decoded user ID. If the header is absent or the token is invalid/expired, the catch block swallows the error and `userId` remains `null`. The audit proceeds normally in both cases — auth is not required to run an audit. See [ADR 0007](decisions/0007-auth-optional.md).
 
 **4. Vite proxy forwards to Vercel**
 `vite.config.js` proxies `/api/*` → `http://localhost:3000` (running `vercel dev`).
@@ -114,8 +142,10 @@ Uses `fetch()` + `response.body.getReader()` — not `EventSource`, because `Eve
 **5. SSE headers go out immediately**
 `api/lighthouse.js` → `handler()` writes `200 text/event-stream` headers before touching Chrome. The connection is now open. The frontend's `fetch` resolves here — the `getReader()` loop starts consuming.
 
-**6. Browser launch (progress: 0% → 30%)**
+**6. Browser launch and warmup (progress: 0% → 30%)**
 `api/lighthouse.js` → `prepareBrowser(isProduction, onProgress)` calls `getLaunchConfig.js`. In production (`process.env.VERCEL` truthy): `@sparticuz/chromium` provides a pre-built Chromium binary path and launch args. In development: `findLocalChrome.js` locates the local Chrome install. `puppeteer.launch(launchConfig)` starts the browser and returns a `wsEndpoint` (a `ws://localhost:{port}/...` URL).
+
+After the browser is ready, `runWarmupAudit()` silently runs one extra Lighthouse audit whose result is immediately discarded. This warms up Chrome's DNS cache, V8 JIT, and TCP connections to the target site. No progress events are emitted during the warmup — it is absorbed into the 0–30% initialization window. See [ADR 0006](decisions/0006-warmup-run-discarding.md).
 
 **7. Lighthouse connects to Chrome via CDP**
 `api/lighthouse.js` → `runLighthouseAudit()` extracts the port from `wsEndpoint`:
@@ -124,8 +154,8 @@ port: new URL(wsEndpoint).port
 ```
 Lighthouse does **not** launch its own browser — it connects via Chrome DevTools Protocol (CDP) WebSocket to the Puppeteer-managed Chrome instance. This is why the two are decoupled.
 
-**8. Lighthouse runs (progress: 25% → 95%)**
-`lighthouse(url, {port, output: 'json', logLevel: 'error'}, lighthouseConfig)` runs the full audit. Lighthouse exposes no granular progress events during execution. A `setInterval` running every 2 seconds simulates progress by adding 5–10% increments, capped at 90% of each run's allocated slice. All `onProgress()` calls enforce monotonic increase before writing `data: {...}\n\n` to the response.
+**8. Lighthouse runs (progress: 30% → 100%)**
+`lighthouse(url, {port, output: 'json', logLevel: 'error'}, lighthouseConfig)` runs the full audit. Lighthouse exposes no granular progress events during execution. A `setInterval` running every 2 seconds simulates progress by adding 5–10% increments. The 30–100% range is divided equally across N real runs: run i starts at `30 + i*(70/N)%` and completes at `30 + (i+1)*(70/N)%`. All `onProgress()` calls enforce monotonic increase before writing `data: {...}\n\n` to the response.
 
 **9. lhr extraction**
 On `lighthouse()` resolving, `api/lighthouse.js` extracts from the raw `lhr` (Lighthouse Result) object:
@@ -144,8 +174,11 @@ After all runs complete, `calculateAverages(runResults)` computes arithmetic mea
 **12. `complete` event closes the stream**
 Single run: `{type: 'complete', data: {run, summary}}`. Multi-run: `{type: 'complete', data: {runs[], averages, summary}}`. `res.end()` is called. `browser.close()` runs in the `finally` block regardless of success or failure.
 
+**12b. DB persistence (authenticated users only)**
+Before `res.end()`, `persistAuditRun()` is called if `userId !== null`. It upserts the target URL into `targets`, inserts a row into `runs` (with `runs_count = N`), inserts 10 metric rows (4 category scores + 6 CWVs) into `metrics`, and optionally inserts the full lhr into `run_artifacts` (only when `auditView === 'full'`). The write is awaited synchronously before `res.end()` — Vercel terminates the function the moment `res.end()` is called, so any async work deferred to `finally` cannot be guaranteed to complete.
+
 **13. Frontend finalizes state**
-`useLighthouseAudit.js` → `handleProgressUpdate()` handles `type: 'complete'`: sets `auditResults`, finalizes `scores`/`detailedMetrics`/`opportunities`/`diagnostics`/`fullReport`.
+`useLighthouseAudit.js` → `handleProgressUpdate()` handles `type: 'complete'`: sets `auditResults`, finalizes `scores`/`detailedMetrics`/`opportunities`/`diagnostics`/`fullReport`. Also calls `showNotification()` from `useAuditNotification` — shows an "Audit complete ✓" badge that auto-dismisses after 2 seconds of the tab being visible (Page Visibility API).
 
 **14. UI updates**
 Vue reactivity propagates to `PerformanceMetrics.vue` (score cards), `AuditResults.vue` (table or full report). `AuditResults.vue` watches `hasAuditData` and triggers `animateSlideDownEntry()` + `animateCascade()` via GSAP. `HomeView.vue` watches `progress` hitting 100 and calls `playOn()` (pop sound via `useSound.js`).
@@ -198,13 +231,28 @@ The one real tradeoff: SSE is unidirectional. If you wanted to cancel an in-prog
 
 **OpenAI latency.** The AI summary (`api/ai-summary.js`) makes a synchronous `fetch` call to the OpenAI Chat Completions API. Response time varies 1–10 seconds. This is a separate request triggered by the user, not part of the audit stream, so it doesn't block audit results — but it makes the AI summary panel feel slow on poor network days.
 
-**If traffic 10×'d:** The serverless model scales automatically (Vercel spins up new instances), but cost and cold-start frequency would spike. More critically, there's no auth and no rate limiting — anyone can trigger a 60-second Chrome instance. The realistic failure mode is Vercel usage bill, not downtime.
+**Warmup run cost.** Every audit now runs N+1 Lighthouse executions — one silent warmup plus N real runs. On a slow target site (20s/run), a 3-run audit now takes ~80 seconds of Chrome time instead of ~60, pushing hard against Vercel's 60-second function timeout. Users running 3+ runs on slow sites should consider using the Express backend (no timeout). See [ADR 0006](decisions/0006-warmup-run-discarding.md).
+
+**DB write before `res.end()`.** `persistAuditRun()` in `api/lighthouse.js` is awaited synchronously before the response ends. A slow Neon connection or a lock on the `targets` table adds latency between the `complete` SSE event and the stream closing. On first invocation after a cold period, both the Vercel function and the Neon connection are cold — a combined cold-start penalty of 3–5s (Vercel) + 100–300ms (Neon HTTP handshake) is possible.
+
+**Neon cold connections.** The Neon serverless driver (`@neondatabase/serverless`) uses HTTP rather than persistent TCP. Every invocation that hits a cold Neon edge node opens a new HTTP session. This is faster than a full TCP + TLS + Postgres handshake (Neon caches the heavy parts at the edge) but still adds ~100–300ms on cold paths. Unlike a pg connection pool, there are no idle connections to reuse across invocations.
+
+**If traffic 10×'d:** The serverless model scales automatically (Vercel spins up new instances), but cost and cold-start frequency would spike. Guest audits have no rate limiting — anyone can trigger a 60-second Chrome instance. The realistic failure mode is Vercel usage bill, not downtime. Phase 4 rate limiting will partially mitigate this.
 
 ---
 
 ## 7. What's NOT here yet
 
-Audit results are held in browser memory only (no persistence), the API is open to any visitor (no auth), there is no rate limiting, no scheduled jobs, no audit cancellation, and no multi-tenancy. All are intentional v1 deferments.
+**Authentication and persistence are now implemented** (Phase 1 complete, 2026-04-27). Logged-in users can run audits, close the tab, return to `/history`, and see saved results. Guests can still audit without an account — results are ephemeral.
+
+What remains unbuilt (as of Phase 1 completion):
+
+- **Rate limiting** — no per-IP or per-user quotas. Guest audits are entirely open. The realistic risk is Vercel usage cost on a viral day. Planned for Phase 4 via Redis token bucket.
+- **Scheduled / background jobs** — audits are triggered only by user action; no cron-style scheduled audits. Requires BullMQ + a persistent worker (the Express backend). Planned for Phase 2.
+- **Audit cancellation** — no `DELETE /api/jobs/:id` or SSE close detection. An in-progress audit that the user navigates away from continues to completion server-side.
+- **Multi-tenancy / team workspaces** — all data is user-scoped; no team or organization sharing layer.
+- **Trend visualization** — the data exists in Postgres (runs + metrics over time) but the frontend has no time-series chart yet. Planned for Phase 2.
+- **Token refresh** — the JWT is a single 7-day access token. No refresh token, no sliding sessions. After expiry, the user is silently logged out.
 
 For the full phased plan — what's next, in what order, and what's deliberately out of scope — see [`docs/ROADMAP.md`](ROADMAP.md).
 
@@ -228,6 +276,14 @@ For the full phased plan — what's next, in what order, and what's deliberately
 
 **`@sparticuz/chromium`**: A community-maintained stripped Chromium build (~80MB compressed) designed to run in AWS Lambda-style serverless environments where a full Chrome install is impractical. It provides the `executablePath` and recommended launch `args` for headless serverless operation.
 
+**JWT (JSON Web Token)**: A compact, self-contained token format used for stateless authentication. `api/lib/auth.js` issues JWTs signed with `JWT_SECRET` via `jsonwebtoken`. Clients include them as `Authorization: Bearer <token>`. The server verifies the signature without a DB lookup. Tokens expire after 7 days; there is no refresh token.
+
+**Neon**: A serverless Postgres provider. The project uses `@neondatabase/serverless`, which runs queries over HTTP rather than persistent TCP, making it compatible with Vercel's stateless function model. The connection string in `DATABASE_URL` points to Neon's pooled endpoint.
+
+**bcrypt**: A password-hashing algorithm with a configurable cost factor. Used in `api/auth/signup.js` with a cost of 10. Raw passwords are never stored. `bcrypt.compare()` in `api/auth/login.js` validates login attempts in constant time.
+
+**node-pg-migrate**: A SQL migration tool (dev dependency). Migration files live in `migrations/`. The `npm run db:migrate` / `db:migrate:down` / `db:migrate:create` scripts wrap its CLI with `--env-file=.env` so `DATABASE_URL` is loaded automatically.
+
 ---
 
 ## Appendix: known inconsistencies
@@ -240,4 +296,4 @@ These were found during the architecture audit and do not yet match the code:
 
 3. ~~**`import fs from 'fs'` in `api/lighthouse.js:3`** — unused import.~~ **Fixed** — import removed.
 
-4. **Multi-run opportunities and diagnostics are not averaged.** `calculateAverages()` in `api/lighthouse.js` (lines 412–414) takes both fields from `results[0]` only. Only `scores` and `metrics` are arithmetically averaged. Documented and deferred in [ADR 0005](decisions/0005-multi-run-aggregation-strategy.md).
+4. **Multi-run opportunities and diagnostics are not averaged.** `calculateAverages()` in `api/lighthouse.js` takes both fields from `results[0]` only. Only `scores` and `metrics` are arithmetically averaged. Documented and deferred in [ADR 0005](decisions/0005-multi-run-aggregation-strategy.md). Note: with the warmup run now discarded, `results[0]` is the first *real* run, not the warmup.

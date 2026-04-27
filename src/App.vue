@@ -1,6 +1,9 @@
 <script setup>
 import { ref, provide, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import AppLayout from './components/layout/AppLayout.vue'
+
+const router = useRouter()
 
 // Dark mode state - provide to all children
 const isDarkMode = ref(false)
@@ -11,10 +14,35 @@ const currentDevice = ref('desktop')
 const currentThrottle = ref('none')
 const currentAuditView = ref('standard')
 
+// Auth state
+const user = ref(null)
+const token = ref(null)
+
+const login = (newToken, newUser) => {
+  token.value = newToken
+  user.value = newUser
+  localStorage.setItem('lh_token', newToken)
+  localStorage.setItem('lh_user', JSON.stringify(newUser))
+}
+
+const logout = () => {
+  token.value = null
+  user.value = null
+  localStorage.removeItem('lh_token')
+  localStorage.removeItem('lh_user')
+  router.push('/auth')
+}
+
 // Clean up any existing theme classes on mount
 onMounted(() => {
-  // Remove any existing theme classes that might be causing conflicts
   document.documentElement.classList.remove('my-app-dark', 'dark')
+
+  const storedToken = localStorage.getItem('lh_token')
+  const storedUser = localStorage.getItem('lh_user')
+  if (storedToken && storedUser) {
+    token.value = storedToken
+    user.value = JSON.parse(storedUser)
+  }
 })
 
 const toggleDarkMode = () => {
@@ -28,6 +56,10 @@ provide('currentRuns', currentRuns)
 provide('currentDevice', currentDevice)
 provide('currentThrottle', currentThrottle)
 provide('currentAuditView', currentAuditView)
+provide('user', user)
+provide('token', token)
+provide('login', login)
+provide('logout', logout)
 
 // Sidebar selection handlers for AppLayout
 const handleDeviceChange = (device) => {
@@ -71,6 +103,7 @@ const handleThemeChange = (isDark) => {
       :current-device="currentDevice"
       :current-throttle="currentThrottle"
       :current-audit-view="currentAuditView"
+      :user="user"
       @theme-change="handleThemeChange"
       @device-change="handleDeviceChange"
       @throttle-change="handleThrottleChange"

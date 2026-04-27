@@ -17,6 +17,11 @@ cd backend && npm run start  # production, port 3001
 
 # Build
 npm run build && npm run preview
+
+# Database migrations (requires DATABASE_URL in .env)
+npm run db:migrate         # apply pending migrations
+npm run db:migrate:down    # roll back last migration
+npm run db:migrate:create  # scaffold a new SQL migration file
 ```
 
 Full local dev: run `vercel dev` + `npm run dev` together. Vite proxies `/api/*` → `http://localhost:3000`.
@@ -30,15 +35,21 @@ Browser → Vue 3 SPA (src/)
           │  Vercel serverless (api/) │ ← primary deployment
           │  Express server (backend/)│ ← alternate deployment
           └───────────────────────────┘
-              ↓
+              ↓                           ↓
           Puppeteer → Chrome → Lighthouse → lhr → SSE events → frontend refs
+                                                               ↓ (authenticated users)
+                                                           Neon Postgres
 ```
 
-| Layer | Path | Chrome strategy | Details |
-|---|---|---|---|
-| Vercel serverless | `api/` | `puppeteer-core` + `@sparticuz/chromium` | `api/CLAUDE.md` |
-| Express server | `backend/` | `chrome-launcher` (local system Chrome) | `backend/CLAUDE.md` |
-| Vue 3 SPA | `src/` | — | `src/CLAUDE.md` |
+| Layer | Path | Details |
+|---|---|---|
+| Vercel serverless | `api/` | `puppeteer-core` + `@sparticuz/chromium`; auth + DB persistence — `api/CLAUDE.md` |
+| Express server | `backend/` | `chrome-launcher` (local system Chrome); no auth layer — `backend/CLAUDE.md` |
+| Vue 3 SPA | `src/` | `src/CLAUDE.md` |
+| Auth helpers | `api/lib/` | `auth.js` (JWT verify), `db.js` (Neon SQL client) |
+| Auth endpoints | `api/auth/` | `signup.js`, `login.js`, `check-email.js` |
+| History endpoint | `api/history.js` | paginated audit history (authenticated only) |
+| DB migrations | `migrations/` | `node-pg-migrate`; run with `npm run db:migrate` |
 
 ## Cross-cutting rules
 
@@ -52,6 +63,10 @@ Browser → Vue 3 SPA (src/)
 
 ```
 OPENAI_API_KEY    # Required for /api/ai-summary (GPT-4.1)
+DATABASE_URL      # Required for auth + history — Neon Postgres connection string
+                  # e.g. postgresql://user:pass@host/db?sslmode=require
+JWT_SECRET        # Required for auth — 64-byte random hex string
+                  # generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
 `VITE_API_URL` and all `HF_*` Hugging Face vars exist in `.env` but are unused — ignore them.
@@ -63,5 +78,5 @@ OPENAI_API_KEY    # Required for /api/ai-summary (GPT-4.1)
 ## Further reading
 
 - Architecture narrative + data flow diagram: `docs/architecture.md`
-- Decision records (SSE vs WebSockets, dual backend, no auth, no state manager): `docs/decisions/`
-- Planned features + architectural constraints (Postgres, JWT auth, BullMQ, user history): `docs/ROADMAP.md` — **read the Design Constraints section at the top before adding any new backend feature**
+- Decision records (SSE vs WebSockets, dual backend, optional auth, warmup discarding, no state manager): `docs/decisions/`
+- Phased plan + architectural constraints (BullMQ, scheduled jobs, rate limiting): `docs/ROADMAP.md` — **read the Design Constraints section at the top before adding any new backend feature**

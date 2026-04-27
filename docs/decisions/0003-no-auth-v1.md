@@ -1,7 +1,7 @@
 # ADR 0003 — No authentication in v1
 
 ## Status
-Accepted (deferred)
+Superseded by [ADR 0007 — Authentication is optional](0007-auth-optional.md) (2026-04-27)
 
 ## Context
 The tool is currently stateless — any visitor can run an audit. No user accounts, no saved history, no rate limiting.
