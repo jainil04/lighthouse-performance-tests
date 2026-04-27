@@ -1,6 +1,5 @@
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer-core';
-import fs from 'fs';
 import { getLaunchConfig } from './utils/getLaunchConfig.js';
 import { getLighthouseConfig } from './utils/getLighthouseConfig.js';
 

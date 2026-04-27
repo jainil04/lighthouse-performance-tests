@@ -24,17 +24,12 @@
   ],
   "routes": [
     {
-      "src": "/api/lighthouse/audit/stream",
-      "dest": "/api/lighthouse.js"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "/api/$1.js"
     }
   ],
   "env": {
     "LIGHTHOUSE_LOCALE": "en-US",
-    "LC_ALL": "C",
     "LANG": "en_US.UTF-8"
   }
 }

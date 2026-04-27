@@ -109,6 +109,3 @@ process.env.LIGHTHOUSE_LOCALE = 'en-US'
 3. If it performs audits, mirror the logic in `backend/routes/lighthouse.js` and `backend/services/lighthouseService.js`
 4. If it streams SSE, follow the event schema above exactly
 
-## Known issue
-
-`import fs from 'fs'` in `lighthouse.js` — imported but never used. Safe to remove.

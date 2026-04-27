@@ -58,7 +58,7 @@ OPENAI_API_KEY    # Required for /api/ai-summary (GPT-4.1)
 
 ## Deployment
 
-`vercel.json`: `api/*.js` → `@vercel/node`, 60s timeout, 1024MB RAM. Frontend → `@vercel/static-build`. Route `/api/lighthouse/audit/stream` maps explicitly to `api/lighthouse.js`.
+`vercel.json`: `api/*.js` → `@vercel/node`, 60s timeout, 1024MB RAM. Frontend → `@vercel/static-build`. Catch-all route `/api/(.*)` → `/api/$1.js`.
 
 ## Further reading
 
