@@ -78,7 +78,7 @@ KV_URL            # Required for BullMQ job queue — Upstash/Railway Redis, ior
 
 ## Deployment
 
-`vercel.json`: `api/*.js` → `@vercel/node`, 60s timeout, 1024MB RAM. Frontend → `@vercel/static-build`. Catch-all route `/api/(.*)` → `/api/$1.js`.
+`vercel.json`: builds glob `api/{*.js,auth/*.js}` → `@vercel/node`, 60s timeout, 1024MB RAM (scoped glob keeps deployed function count under Vercel Hobby's 12-function limit). Frontend → `@vercel/static-build`. Catch-all route `/api/(.*)` → `/api/$1.js`.
 
 ## Further reading
 

@@ -271,11 +271,10 @@ The one real tradeoff: SSE is unidirectional. If you wanted to cancel an in-prog
 
 **Phase 1 complete** (2026-04-27) — authentication, persistence, and history. Logged-in users can run audits, close the tab, return to `/history`, and see saved results. Guests can still audit without an account — results are ephemeral.
 
-**Phase 2 substantially complete** — the job queue infrastructure, trend visualization, and scheduled audits UI are all live. Users configure Daily/Weekly/Monthly audit schedules per URL from `HistoryView.vue`; `POST /api/jobs` enqueues a BullMQ repeatable job that re-fires automatically on the cron pattern with no further intervention.
+**Phase 2 complete** (2026-04-28) — job queue infrastructure, trend visualization, scheduled audits UI, and regression detection are all live. Users configure Daily/Weekly/Monthly audit schedules per URL from `HistoryView.vue`; `POST /api/jobs` enqueues a BullMQ repeatable job that re-fires automatically on the cron pattern with no further intervention. `HistoryView.vue` computes `regressionMap` comparing the most recent run against the average of all previous runs for the filtered URL and renders an exclamation-triangle icon on regressed metric badges (thresholds: score metrics ≥10 point drop, time metrics ≥20% increase, CLS ≥0.1 increase).
 
 What remains unbuilt:
 
-- **Regression detection** — no visual callout when a metric degrades vs. rolling baseline. Planned for Phase 2.
 - **Rate limiting** — no per-IP or per-user quotas. Guest audits are entirely open. Planned for Phase 4 via Redis token bucket.
 - **Audit cancellation** — no `DELETE /api/jobs/:id` or SSE close detection. An in-progress audit that the user navigates away from continues to completion server-side.
 - **Multi-tenancy / team workspaces** — all data is user-scoped; no team or organization sharing layer.

@@ -201,6 +201,31 @@ let chartInstance = null
 
 const showChart = computed(() => urlFilter.value.trim() !== '' && runs.value.length >= 2)
 
+const regressionMap = computed(() => {
+  if (!urlFilter.value.trim() || runs.value.length < 2) return new Set()
+  const latest = runs.value[0]
+  const previous = runs.value.slice(1)
+  const avg = (metric) => {
+    const vals = previous.map(r => r.scores[metric]).filter(v => v !== null && v !== undefined)
+    return vals.length === 0 ? null : vals.reduce((a, b) => a + b, 0) / vals.length
+  }
+  const regressed = new Set()
+  for (const metric of ['performance', 'accessibility', 'best_practices', 'seo']) {
+    const base = avg(metric)
+    const cur = latest.scores[metric]
+    if (base !== null && cur !== null && cur !== undefined && base - cur >= 10) regressed.add(metric)
+  }
+  for (const metric of ['lcp', 'fcp', 'tbt', 'si', 'tti']) {
+    const base = avg(metric)
+    const cur = latest.scores[metric]
+    if (base !== null && cur !== null && cur !== undefined && base > 0 && cur >= base * 1.2) regressed.add(metric)
+  }
+  const clsBase = avg('cls')
+  const clsCur = latest.scores['cls']
+  if (clsBase !== null && clsCur !== null && clsCur !== undefined && clsCur - clsBase >= 0.1) regressed.add('cls')
+  return regressed
+})
+
 const buildChart = () => {
   if (chartInstance) {
     chartInstance.destroy()
@@ -473,6 +498,7 @@ onUnmounted(() => {
           <Column header="Performance" style="width: 8rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', badgeClass(data.scores.performance)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('performance')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ data.scores.performance ?? '—' }}
               </span>
             </template>
@@ -481,6 +507,7 @@ onUnmounted(() => {
           <Column header="Accessibility" style="width: 9rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', badgeClass(data.scores.accessibility)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('accessibility')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ data.scores.accessibility ?? '—' }}
               </span>
             </template>
@@ -489,6 +516,7 @@ onUnmounted(() => {
           <Column header="Best Practices" style="width: 9rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', badgeClass(data.scores.best_practices)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('best_practices')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ data.scores.best_practices ?? '—' }}
               </span>
             </template>
@@ -497,6 +525,7 @@ onUnmounted(() => {
           <Column header="SEO" style="width: 6rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', badgeClass(data.scores.seo)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('seo')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ data.scores.seo ?? '—' }}
               </span>
             </template>
@@ -505,6 +534,7 @@ onUnmounted(() => {
           <Column header="FCP" style="width: 6rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums', cwvBadgeClass('fcp', data.scores.fcp)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('fcp')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ formatMs(data.scores.fcp) }}
               </span>
             </template>
@@ -513,6 +543,7 @@ onUnmounted(() => {
           <Column header="LCP" style="width: 6rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums', cwvBadgeClass('lcp', data.scores.lcp)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('lcp')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ formatMs(data.scores.lcp) }}
               </span>
             </template>
@@ -521,6 +552,7 @@ onUnmounted(() => {
           <Column header="SI" style="width: 6rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums', cwvBadgeClass('si', data.scores.si)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('si')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ formatMs(data.scores.si) }}
               </span>
             </template>
@@ -529,6 +561,7 @@ onUnmounted(() => {
           <Column header="CLS" style="width: 6rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums', cwvBadgeClass('cls', data.scores.cls)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('cls')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ formatCls(data.scores.cls) }}
               </span>
             </template>
@@ -537,6 +570,7 @@ onUnmounted(() => {
           <Column header="TBT" style="width: 6rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums', cwvBadgeClass('tbt', data.scores.tbt)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('tbt')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ formatTbt(data.scores.tbt) }}
               </span>
             </template>
@@ -545,6 +579,7 @@ onUnmounted(() => {
           <Column header="TTI" style="width: 6rem">
             <template #body="{ data }">
               <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums', cwvBadgeClass('tti', data.scores.tti)]">
+                <i v-if="data.id === runs[0]?.id && regressionMap.has('tti')" class="pi pi-exclamation-triangle text-xs text-amber-500 mr-1" />
                 {{ formatMs(data.scores.tti) }}
               </span>
             </template>

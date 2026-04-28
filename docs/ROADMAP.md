@@ -96,23 +96,23 @@ These are architectural facts that must inform any new backend work. They are no
 
 ---
 
-### Phase 2 — Async + Scheduled Work (~2 weeks)
+### Phase 2 — Async + Scheduled Work ✅ Complete (2026-04-28)
 
 *Purpose: introduce background job processing — the area where senior-level backend depth is most visible. Audits become proactive rather than reactive.*
 
 **Infrastructure**
 - ✅ Redis — Upstash/Railway free tier, using `KV_URL` via ioredis TCP connection
-- ✅ BullMQ worker — persistent process in `backend/workers/auditWorker.js`, started via dynamic import in `backend/server.js`
+- ✅ BullMQ worker — persistent process in `backend/workers/auditWorker.js`, started via dynamic import in `backend/server.js`; listens on queue named `audit`; 3 retries with exponential backoff
 - ✅ `POST /api/jobs` — enqueue a scheduled audit; returns job ID. Also `GET /api/jobs` returns scheduled targets for the user.
-- ✅ DB migration `1777409249711_add-schedule-column` — adds `schedule TEXT` and `scheduled_audits_enabled BOOLEAN` to `targets`
+- ✅ DB migration `1777409249711_add-schedule-column` — adds `schedule TEXT` and `scheduled_audits_enabled BOOLEAN NOT NULL DEFAULT FALSE` to `targets`
 
 **Features**
-- ✅ Scheduled audits — cron-style configuration per target URL, UI in `HistoryView.vue` with Daily/Weekly/Monthly presets, enforced server-side whitelist of allowed cron strings, max 5 scheduled URLs per user enforced in both `api/jobs.js` and the UI
+- ✅ Scheduled audits — cron-style configuration per target URL, UI in `HistoryView.vue` with Daily/Weekly/Monthly presets; shows "Scheduled ✓" badge when active; fetches existing schedules on mount via `GET /api/jobs`; enforced server-side whitelist of allowed cron strings; max 5 scheduled URLs per user enforced in both `api/jobs.js` and the UI
 - ✅ BullMQ repeatable jobs — `api/jobs.js` uses `repeat: { pattern: schedule }` so jobs re-enqueue automatically on the cron schedule
 - ✅ Trend visualization — line chart of Performance, FCP, LCP, CLS, TBT over time, shown in `HistoryView.vue` when a URL filter is active and 2+ runs exist
-- 📋 Regression detection — visual callout when a metric degrades by more than a configurable threshold vs. the rolling baseline
+- ✅ Regression detection — `regressionMap` computed property in `HistoryView.vue` compares the most recent run against the average of all previous runs for the filtered URL; renders an exclamation-triangle icon on regressed metric badges in the most recent row only; thresholds: score metrics ≥10 point drop, time metrics ≥20% increase, CLS ≥0.1 increase
 
-**Definition of done:** A user can configure a URL to audit daily; the next morning, results appear in history without the user having triggered anything; the trend chart shows at least two data points with a visible regression indicator if scores dropped.
+**Definition of done:** ✅ A user can configure a URL to audit daily; the next morning, results appear in history without the user having triggered anything; the trend chart shows at least two data points with a visible regression indicator if scores dropped.
 
 ---
 
