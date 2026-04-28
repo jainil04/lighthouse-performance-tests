@@ -107,7 +107,8 @@ These are architectural facts that must inform any new backend work. They are no
 - ✅ DB migration `1777409249711_add-schedule-column` — adds `schedule TEXT` and `scheduled_audits_enabled BOOLEAN` to `targets`
 
 **Features**
-- 📋 Scheduled audits UI — cron-style configuration per target URL ("run every day at 09:00")
+- ✅ Scheduled audits — cron-style configuration per target URL, UI in `HistoryView.vue` with Daily/Weekly/Monthly presets, enforced server-side whitelist of allowed cron strings, max 5 scheduled URLs per user enforced in both `api/jobs.js` and the UI
+- ✅ BullMQ repeatable jobs — `api/jobs.js` uses `repeat: { pattern: schedule }` so jobs re-enqueue automatically on the cron schedule
 - ✅ Trend visualization — line chart of Performance, FCP, LCP, CLS, TBT over time, shown in `HistoryView.vue` when a URL filter is active and 2+ runs exist
 - 📋 Regression detection — visual callout when a metric degrades by more than a configurable threshold vs. the rolling baseline
 

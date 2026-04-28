@@ -50,7 +50,7 @@ Browser → Vue 3 SPA (src/)
 | DB persistence util | `api/lib/persistAuditRun.js` | shared helper used by `api/lighthouse.js` and the BullMQ worker |
 | Auth endpoints | `api/auth/` | `signup.js`, `login.js`, `check-email.js` |
 | History endpoint | `api/history.js` | paginated audit history (authenticated only) |
-| Jobs endpoints | `api/jobs.js` | `POST` enqueue scheduled audit, `GET` list targets for user |
+| Jobs endpoints | `api/jobs.js` | `POST` enqueues a repeatable BullMQ audit job (`repeat: { pattern: schedule }`) and upserts the target row with the schedule column set; `GET` returns all scheduled targets for the authenticated user. Server-side: max 5 scheduled URLs per user, schedule must be one of `"0 9 * * *"` (daily) / `"0 9 * * 1"` (weekly) / `"0 9 1 * *"` (monthly). Schedule UI lives in `HistoryView.vue` — appears when a URL filter is active and the user is logged in |
 | BullMQ worker | `backend/workers/auditWorker.js` | persistent process; started automatically via dynamic import in `backend/server.js` |
 | DB migrations | `migrations/` | `node-pg-migrate`; run with `npm run db:migrate` |
 

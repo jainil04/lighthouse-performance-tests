@@ -44,13 +44,14 @@ flowchart TD
     OpenAI["OpenAI GPT-4.1\napi/ai-summary.js"]
     NeonDB[("Neon Postgres\n@neondatabase/serverless\nusers · targets · runs\nmetrics · run_artifacts")]
     VFuncJobs["api/jobs.js\nPOST enqueue / GET list"]
-    Redis[("Redis\nUpstash/Railway\nKV_URL — ioredis TCP\nBullMQ queue")]
+    Redis[("Redis\nUpstash/Railway\nKV_URL — ioredis TCP\nBullMQ repeatable queue")]
     Worker["backend/workers/auditWorker.js\nBullMQ worker\n(persistent, Express process)"]
 
     User -->|"load app"| SPA
     SPA -->|"POST /api/lighthouse\n{url, device, runs, auditView}\n+ optional Bearer token"| Proxy
     Proxy -->|dev: proxy to :3000| VFunc
     SPA -->|"SSE stream\ndata: {...}\\n\\n"| User
+    SPA -->|"POST /api/jobs\n{url, schedule}"| VFuncJobs
     VFunc --> Puppeteer
     Puppeteer -->|"launch + wsEndpoint"| Chrome
     Chrome -->|"CDP WebSocket"| LH
@@ -60,10 +61,10 @@ flowchart TD
     VFunc2 -->|"fetch"| OpenAI
     VFuncAuth -->|"users table"| NeonDB
     VFuncHistory -->|"runs + metrics JOIN"| NeonDB
-    VFuncJobs -->|"enqueue job"| Redis
-    Redis -->|"dequeue"| Worker
+    VFuncJobs -->|"repeatable job\nrepeat:{pattern:schedule}"| Redis
+    Redis -->|"auto-dequeue on cron"| Worker
     Worker -->|"persist run + metrics"| NeonDB
-    Worker -.->|"same audit logic\nchrome-launcher"| Chrome
+    Worker -.->|"Lighthouse via\nchrome-launcher"| Chrome
     Express -.->|"same audit logic\nchrome-launcher instead"| Chrome
 ```
 
@@ -219,8 +220,9 @@ BullMQ scheduled jobs (see [ROADMAP Phase 2](ROADMAP.md)) require a persistent R
 Scheduled audits use BullMQ backed by Redis (`KV_URL`, ioredis TCP connection to Upstash/Railway).
 
 **Enqueue path (`POST /api/jobs`):**
-1. The Vercel serverless function authenticates the request, validates the target URL, and adds a job to the BullMQ queue in Redis.
-2. The job payload carries `{userId, targetId, url, device, runs}`. The function returns the job ID immediately — no audit runs synchronously.
+1. The Vercel serverless function authenticates the request, validates the schedule against a whitelist (`"0 9 * * *"` / `"0 9 * * 1"` / `"0 9 1 * *"`), enforces a max-5-scheduled-URLs-per-user cap, and upserts the target row in Postgres with the `schedule` column set.
+2. The job is added to BullMQ with `repeat: { pattern: schedule }` — BullMQ stores the cron pattern in Redis and automatically re-enqueues the job after each execution, indefinitely, with no further API calls required.
+3. The job payload carries `{userId, url, device, runs}`. The function returns the job ID immediately — no audit runs synchronously.
 
 **Worker path (`backend/workers/auditWorker.js`):**
 1. `backend/server.js` dynamically imports the worker on startup. The worker connects to the same Redis queue and registers a `process` handler.
@@ -269,11 +271,10 @@ The one real tradeoff: SSE is unidirectional. If you wanted to cancel an in-prog
 
 **Phase 1 complete** (2026-04-27) — authentication, persistence, and history. Logged-in users can run audits, close the tab, return to `/history`, and see saved results. Guests can still audit without an account — results are ephemeral.
 
-**Phase 2 partially complete** — the job queue infrastructure and trend visualization are live. Scheduled audit execution is wired but the UI for configuring schedules is not yet built.
+**Phase 2 substantially complete** — the job queue infrastructure, trend visualization, and scheduled audits UI are all live. Users configure Daily/Weekly/Monthly audit schedules per URL from `HistoryView.vue`; `POST /api/jobs` enqueues a BullMQ repeatable job that re-fires automatically on the cron pattern with no further intervention.
 
 What remains unbuilt:
 
-- **Scheduled audits UI** — users can't yet configure per-URL cron schedules from the frontend. The backend queue (`POST /api/jobs`) and worker are ready; the configuration UI is the missing piece.
 - **Regression detection** — no visual callout when a metric degrades vs. rolling baseline. Planned for Phase 2.
 - **Rate limiting** — no per-IP or per-user quotas. Guest audits are entirely open. Planned for Phase 4 via Redis token bucket.
 - **Audit cancellation** — no `DELETE /api/jobs/:id` or SSE close detection. An in-progress audit that the user navigates away from continues to completion server-side.

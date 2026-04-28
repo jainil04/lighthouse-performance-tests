@@ -21,6 +21,7 @@ import {
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Legend, Tooltip)
 
 const isDarkMode = inject('isDarkMode', ref(false))
+const token = inject('token', ref(null))
 const { runs, total, page, limit, loading, error, fetchHistory } = useAuditHistory()
 
 const urlFilter = ref('')
@@ -87,7 +88,112 @@ const clearFilter = () => {
 }
 const onPageChange = (event) => load(event.page + 1)
 
-onMounted(() => load(1))
+// ── Scheduled audits ───────────────────────────────────────────────────────
+const scheduledTargets = ref([])
+const showScheduleModal = ref(false)
+const scheduleModalError = ref('')
+const scheduleModalSuccess = ref(false)
+const scheduleSubmitting = ref(false)
+const selectedSchedule = ref('')
+const comingSoonVisible = ref(false)
+
+const CRON_LABELS = {
+  '0 9 * * *': 'Daily',
+  '0 9 * * 1': 'Weekly',
+  '0 9 1 * *': 'Monthly',
+}
+const cronToLabel = (cron) => CRON_LABELS[cron] ?? cron
+
+const currentFilterUrl = computed(() => urlFilter.value.trim())
+
+const filteredUrlTarget = computed(() =>
+  scheduledTargets.value.find(t => t.url === currentFilterUrl.value) ?? null
+)
+
+const isAlreadyScheduled = computed(() => filteredUrlTarget.value !== null)
+
+const isAtScheduleLimit = computed(() =>
+  scheduledTargets.value.length >= 5 && !isAlreadyScheduled.value
+)
+
+const fetchScheduledTargets = async () => {
+  if (!token.value) return
+  try {
+    const res = await fetch('/api/jobs', {
+      headers: { Authorization: `Bearer ${token.value}` },
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    scheduledTargets.value = data.targets ?? []
+  } catch { /* ignore */ }
+}
+
+const openScheduleModal = () => {
+  scheduleModalError.value = ''
+  scheduleModalSuccess.value = false
+  comingSoonVisible.value = false
+  selectedSchedule.value = filteredUrlTarget.value?.schedule ?? ''
+  showScheduleModal.value = true
+}
+
+const closeScheduleModal = () => {
+  showScheduleModal.value = false
+  scheduleModalError.value = ''
+  scheduleModalSuccess.value = false
+  comingSoonVisible.value = false
+  selectedSchedule.value = ''
+}
+
+const submitSchedule = async () => {
+  if (!selectedSchedule.value || scheduleSubmitting.value) return
+  scheduleSubmitting.value = true
+  scheduleModalError.value = ''
+  scheduleModalSuccess.value = false
+  try {
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify({
+        url: currentFilterUrl.value,
+        device: 'desktop',
+        runs: 1,
+        schedule: selectedSchedule.value,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      scheduleModalError.value = data.error === 'Maximum 5 scheduled URLs allowed'
+        ? "You've reached the limit of 5 scheduled URLs"
+        : (data.error ?? 'Failed to schedule audit')
+      return
+    }
+    scheduleModalSuccess.value = true
+    const idx = scheduledTargets.value.findIndex(t => t.url === currentFilterUrl.value)
+    if (idx >= 0) {
+      scheduledTargets.value[idx] = { ...scheduledTargets.value[idx], schedule: selectedSchedule.value }
+    } else {
+      scheduledTargets.value.push({ url: currentFilterUrl.value, schedule: selectedSchedule.value })
+    }
+    setTimeout(closeScheduleModal, 1500)
+  } catch {
+    scheduleModalError.value = 'Network error — please try again'
+  } finally {
+    scheduleSubmitting.value = false
+  }
+}
+
+const removeSchedule = () => {
+  comingSoonVisible.value = true
+  setTimeout(() => { comingSoonVisible.value = false }, 3000)
+}
+
+onMounted(() => {
+  load(1)
+  fetchScheduledTargets()
+})
 
 // ── Trend chart ────────────────────────────────────────────────────────────
 const chartCanvas = ref(null)
@@ -247,6 +353,19 @@ onUnmounted(() => {
         aria-label="Clear filter"
         @click="clearFilter"
       />
+      <span
+        v-if="urlFilter && token"
+        class="inline-flex"
+        :title="isAtScheduleLimit ? 'Maximum 5 scheduled URLs reached' : ''"
+      >
+        <Button
+          icon="pi pi-clock"
+          :label="isAlreadyScheduled ? 'Scheduled ✓' : 'Schedule'"
+          :severity="isAlreadyScheduled ? 'primary' : 'secondary'"
+          :disabled="isAtScheduleLimit"
+          @click="openScheduleModal"
+        />
+      </span>
     </div>
 
     <!-- Error -->
@@ -442,6 +561,95 @@ onUnmounted(() => {
         @page="onPageChange"
       />
     </template>
+
+    <!-- Schedule modal -->
+    <div
+      v-if="showScheduleModal"
+      class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+      @click.self="closeScheduleModal"
+    >
+      <div
+        :class="['rounded-lg p-6 border w-full max-w-md mx-4', isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200']"
+      >
+        <div class="flex items-start justify-between mb-4">
+          <div class="flex-1 min-w-0 pr-4">
+            <h2 :class="['text-lg font-semibold', isDarkMode ? 'text-white' : 'text-gray-900']">
+              Schedule audits for
+            </h2>
+            <span
+              class="font-mono text-xs block mt-1 truncate"
+              :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'"
+            >
+              {{ currentFilterUrl }}
+            </span>
+          </div>
+          <Button icon="pi pi-times" text severity="secondary" aria-label="Close" @click="closeScheduleModal" />
+        </div>
+
+        <p
+          v-if="filteredUrlTarget"
+          :class="['text-sm mb-4', isDarkMode ? 'text-gray-400' : 'text-gray-500']"
+        >
+          Currently: <strong>{{ cronToLabel(filteredUrlTarget.schedule) }}</strong>
+        </p>
+
+        <div class="flex gap-2 mb-5">
+          <Button
+            label="Daily"
+            :severity="selectedSchedule === '0 9 * * *' ? 'primary' : 'secondary'"
+            @click="selectedSchedule = '0 9 * * *'"
+          />
+          <Button
+            label="Weekly"
+            :severity="selectedSchedule === '0 9 * * 1' ? 'primary' : 'secondary'"
+            @click="selectedSchedule = '0 9 * * 1'"
+          />
+          <Button
+            label="Monthly"
+            :severity="selectedSchedule === '0 9 1 * *' ? 'primary' : 'secondary'"
+            @click="selectedSchedule = '0 9 1 * *'"
+          />
+        </div>
+
+        <div
+          v-if="scheduleModalError"
+          :class="['text-sm mb-4 p-3 rounded-lg', isDarkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800']"
+        >
+          {{ scheduleModalError }}
+        </div>
+        <div
+          v-if="scheduleModalSuccess"
+          :class="['text-sm mb-4 p-3 rounded-lg', isDarkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800']"
+        >
+          Scheduled successfully!
+        </div>
+        <div
+          v-if="comingSoonVisible"
+          :class="['text-sm mb-4 p-3 rounded-lg', isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800']"
+        >
+          Remove schedule — coming soon!
+        </div>
+
+        <div class="flex items-center gap-2">
+          <Button
+            v-if="isAlreadyScheduled"
+            label="Remove schedule"
+            severity="danger"
+            text
+            @click="removeSchedule"
+          />
+          <div class="flex gap-2 ml-auto">
+            <Button label="Cancel" severity="secondary" @click="closeScheduleModal" />
+            <Button
+              label="Save schedule"
+              :disabled="!selectedSchedule || scheduleSubmitting"
+              :loading="scheduleSubmitting"
+              @click="submitSchedule"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>

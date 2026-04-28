@@ -48,9 +48,25 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'url and schedule are required' });
   }
 
+  const VALID_SCHEDULES = ['0 9 * * *', '0 9 * * 1', '0 9 1 * *'];
+  if (!VALID_SCHEDULES.includes(schedule)) {
+    return res.status(400).json({ error: 'Invalid schedule. Allowed: daily, weekly, or monthly.' });
+  }
+
   try {
     // Upsert the target row and set the schedule column
     let [target] = await sql`SELECT id FROM targets WHERE user_id = ${userId} AND url = ${url}`;
+
+    const isExistingScheduled = target && target.schedule != null;
+    if (!isExistingScheduled) {
+      const [{ count }] = await sql`
+        SELECT COUNT(*) AS count FROM targets
+        WHERE user_id = ${userId} AND schedule IS NOT NULL
+      `;
+      if (Number(count) >= 5) {
+        return res.status(400).json({ error: 'Maximum 5 scheduled URLs allowed' });
+      }
+    }
     if (!target) {
       [target] = await sql`
         INSERT INTO targets (user_id, url, schedule)
@@ -68,6 +84,7 @@ export default async function handler(req, res) {
       job = await queue.add('audit', { userId, url, device, runs }, {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
+        repeat: { pattern: schedule },
       });
     } finally {
       await queue.close();
