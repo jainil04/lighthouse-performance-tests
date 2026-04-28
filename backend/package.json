@@ -25,7 +25,12 @@
     "chrome-launcher": "^1.1.0",
     "dotenv": "^16.3.1",
     "helmet": "^7.1.0",
-    "compression": "^1.7.4"
+    "compression": "^1.7.4",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.0.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "bcrypt": "^6.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

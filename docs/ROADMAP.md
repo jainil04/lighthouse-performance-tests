@@ -101,13 +101,14 @@ These are architectural facts that must inform any new backend work. They are no
 *Purpose: introduce background job processing — the area where senior-level backend depth is most visible. Audits become proactive rather than reactive.*
 
 **Infrastructure**
-- 📋 Redis — Upstash free tier (serverless-compatible; HTTP-based client works inside Vercel functions for enqueue; worker runs in Express)
-- 📋 BullMQ worker — separate persistent process (Express-based) that consumes the audit queue; cannot run inside Vercel serverless (see [ADR 0001](decisions/0001-dual-deployment-vercel-serverless-and-express.md))
-- 📋 `POST /api/jobs` — enqueue a scheduled audit; returns job ID
+- ✅ Redis — Upstash/Railway free tier, using `KV_URL` via ioredis TCP connection
+- ✅ BullMQ worker — persistent process in `backend/workers/auditWorker.js`, started via dynamic import in `backend/server.js`
+- ✅ `POST /api/jobs` — enqueue a scheduled audit; returns job ID. Also `GET /api/jobs` returns scheduled targets for the user.
+- ✅ DB migration `1777409249711_add-schedule-column` — adds `schedule TEXT` and `scheduled_audits_enabled BOOLEAN` to `targets`
 
 **Features**
-- 📋 Scheduled audits — cron-style configuration per target URL ("run every day at 09:00")
-- 📋 Trend visualization — line charts of FCP / LCP / CLS / TBT over time per saved URL, rendered in the history view
+- 📋 Scheduled audits UI — cron-style configuration per target URL ("run every day at 09:00")
+- ✅ Trend visualization — line chart of Performance, FCP, LCP, CLS, TBT over time, shown in `HistoryView.vue` when a URL filter is active and 2+ runs exist
 - 📋 Regression detection — visual callout when a metric degrades by more than a configurable threshold vs. the rolling baseline
 
 **Definition of done:** A user can configure a URL to audit daily; the next morning, results appear in history without the user having triggered anything; the trend chart shows at least two data points with a visible regression indicator if scores dropped.

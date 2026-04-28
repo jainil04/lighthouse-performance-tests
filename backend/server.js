@@ -2,12 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import dotenv from 'dotenv';
+import { config } from 'dotenv';
 import lighthouseRoutes from './routes/lighthouse.js';
 import { verifyToken } from '../api/lib/auth.js';
 
 // Load environment variables
-dotenv.config();
+config({ path: '../.env' });
+config({ path: '../.env.local', override: true });
+
+// Dynamic import ensures dotenv has run before redis.js and db.js read env vars at module level
+import('./workers/auditWorker.js').catch(err => console.error('[worker] Failed to start:', err));
 
 const app = express();
 const PORT = process.env.PORT || 3001;

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, onMounted } from 'vue'
+import { ref, inject, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useAuditHistory } from '../composables/useAuditHistory.js'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -7,6 +7,18 @@ import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
+import {
+  Chart,
+  LineController,
+  LineElement,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  Legend,
+  Tooltip,
+} from 'chart.js'
+
+Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Legend, Tooltip)
 
 const isDarkMode = inject('isDarkMode', ref(false))
 const { runs, total, page, limit, loading, error, fetchHistory } = useAuditHistory()
@@ -76,6 +88,138 @@ const clearFilter = () => {
 const onPageChange = (event) => load(event.page + 1)
 
 onMounted(() => load(1))
+
+// ── Trend chart ────────────────────────────────────────────────────────────
+const chartCanvas = ref(null)
+let chartInstance = null
+
+const showChart = computed(() => urlFilter.value.trim() !== '' && runs.value.length >= 2)
+
+const buildChart = () => {
+  if (chartInstance) {
+    chartInstance.destroy()
+    chartInstance = null
+  }
+  if (!showChart.value || !chartCanvas.value) return
+
+  // API returns newest-first; reverse so time flows left → right
+  const sorted = [...runs.value].reverse()
+  const labels = sorted.map(r =>
+    new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(r.created_at))
+  )
+
+  const dark = isDarkMode.value
+  const gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
+  const tickColor = dark ? '#9ca3af' : '#6b7280'
+
+  chartInstance = new Chart(chartCanvas.value, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Performance',
+          data: sorted.map(r => r.scores.performance),
+          borderColor: '#3b82f6',
+          backgroundColor: 'transparent',
+          yAxisID: 'y',
+          tension: 0.3,
+          pointRadius: 4,
+          borderWidth: 2,
+        },
+        {
+          label: 'LCP (ms)',
+          data: sorted.map(r => r.scores.lcp),
+          borderColor: '#f59e0b',
+          backgroundColor: 'transparent',
+          yAxisID: 'y1',
+          tension: 0.3,
+          pointRadius: 4,
+          borderWidth: 2,
+        },
+        {
+          label: 'FCP (ms)',
+          data: sorted.map(r => r.scores.fcp),
+          borderColor: '#10b981',
+          backgroundColor: 'transparent',
+          yAxisID: 'y1',
+          tension: 0.3,
+          pointRadius: 4,
+          borderWidth: 2,
+        },
+        {
+          label: 'CLS (raw score)',
+          data: sorted.map(r => r.scores.cls),
+          borderColor: '#ec4899',
+          backgroundColor: 'transparent',
+          yAxisID: 'y1',
+          tension: 0.3,
+          pointRadius: 4,
+          borderWidth: 2,
+        },
+        {
+          label: 'TBT (ms)',
+          data: sorted.map(r => r.scores.tbt),
+          borderColor: '#8b5cf6',
+          backgroundColor: 'transparent',
+          yAxisID: 'y1',
+          tension: 0.3,
+          pointRadius: 4,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: tickColor, usePointStyle: true, pointStyle: 'line', boxWidth: 30 },
+        },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: tickColor },
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          min: 0,
+          max: 100,
+          grid: { color: gridColor },
+          ticks: { color: tickColor },
+          title: { display: true, text: 'Score (0–100)', color: tickColor, font: { size: 11 } },
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { color: tickColor },
+          title: {
+            display: true,
+            text: 'LCP / FCP / TBT (ms)  ·  CLS (raw score)',
+            color: tickColor,
+            font: { size: 11 },
+          },
+        },
+      },
+    },
+  })
+}
+
+// Rebuild whenever the data, filter state, or colour scheme changes.
+// flush:'post' ensures chartCanvas.value is populated after v-if mounts the canvas.
+watch([showChart, runs, isDarkMode], buildChart, { flush: 'post' })
+
+onUnmounted(() => {
+  if (chartInstance) {
+    chartInstance.destroy()
+    chartInstance = null
+  }
+})
 </script>
 
 <template>
@@ -153,8 +297,22 @@ onMounted(() => load(1))
       </p>
     </div>
 
-    <!-- Table + pagination -->
+    <!-- Trend chart + table + pagination -->
     <template v-else>
+
+      <!-- Trend chart — only when filtered by URL with ≥2 data points -->
+      <div
+        v-if="showChart"
+        :class="['rounded-lg p-4 mb-6 border', isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200']"
+      >
+        <h2 :class="['text-sm font-semibold mb-3', isDarkMode ? 'text-gray-300' : 'text-gray-700']">
+          Performance Trend
+        </h2>
+        <div style="position: relative; height: 260px;">
+          <canvas ref="chartCanvas" />
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
         <DataTable :value="runs" class="w-full">
           <Column header="URL">

@@ -47,8 +47,11 @@ Browser → Vue 3 SPA (src/)
 | Express server | `backend/` | `chrome-launcher` (local system Chrome); no auth layer — `backend/CLAUDE.md` |
 | Vue 3 SPA | `src/` | `src/CLAUDE.md` |
 | Auth helpers | `api/lib/` | `auth.js` (JWT verify), `db.js` (Neon SQL client) |
+| DB persistence util | `api/lib/persistAuditRun.js` | shared helper used by `api/lighthouse.js` and the BullMQ worker |
 | Auth endpoints | `api/auth/` | `signup.js`, `login.js`, `check-email.js` |
 | History endpoint | `api/history.js` | paginated audit history (authenticated only) |
+| Jobs endpoints | `api/jobs.js` | `POST` enqueue scheduled audit, `GET` list targets for user |
+| BullMQ worker | `backend/workers/auditWorker.js` | persistent process; started automatically via dynamic import in `backend/server.js` |
 | DB migrations | `migrations/` | `node-pg-migrate`; run with `npm run db:migrate` |
 
 ## Cross-cutting rules
@@ -67,6 +70,8 @@ DATABASE_URL      # Required for auth + history — Neon Postgres connection str
                   # e.g. postgresql://user:pass@host/db?sslmode=require
 JWT_SECRET        # Required for auth — 64-byte random hex string
                   # generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+KV_URL            # Required for BullMQ job queue — Upstash/Railway Redis, ioredis TCP format
+                  # e.g. redis://default:password@host:port
 ```
 
 `VITE_API_URL` and all `HF_*` Hugging Face vars exist in `.env` but are unused — ignore them.

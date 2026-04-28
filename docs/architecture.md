@@ -43,6 +43,9 @@ flowchart TD
 
     OpenAI["OpenAI GPT-4.1\napi/ai-summary.js"]
     NeonDB[("Neon Postgres\n@neondatabase/serverless\nusers · targets · runs\nmetrics · run_artifacts")]
+    VFuncJobs["api/jobs.js\nPOST enqueue / GET list"]
+    Redis[("Redis\nUpstash/Railway\nKV_URL — ioredis TCP\nBullMQ queue")]
+    Worker["backend/workers/auditWorker.js\nBullMQ worker\n(persistent, Express process)"]
 
     User -->|"load app"| SPA
     SPA -->|"POST /api/lighthouse\n{url, device, runs, auditView}\n+ optional Bearer token"| Proxy
@@ -57,6 +60,10 @@ flowchart TD
     VFunc2 -->|"fetch"| OpenAI
     VFuncAuth -->|"users table"| NeonDB
     VFuncHistory -->|"runs + metrics JOIN"| NeonDB
+    VFuncJobs -->|"enqueue job"| Redis
+    Redis -->|"dequeue"| Worker
+    Worker -->|"persist run + metrics"| NeonDB
+    Worker -.->|"same audit logic\nchrome-launcher"| Chrome
     Express -.->|"same audit logic\nchrome-launcher instead"| Chrome
 ```
 
@@ -201,13 +208,30 @@ The Express server uses `chrome-launcher` to find whatever Chrome is already ins
 
 The parity contract: both backends must emit the same SSE event types with identical field names and shapes. The frontend doesn't know which backend it's talking to — it just reads `data: {type, progress, ...}` off the stream. If they diverge, the frontend breaks silently with missing or misnamed fields. Today this is enforced by convention (the rule in `backend/CLAUDE.md`), not by a shared schema or type system.
 
-**The upcoming inflection point**
+**The job queue split (Phase 2)**
 
-BullMQ scheduled jobs (planned — see [ROADMAP Phase 2](ROADMAP.md)) require a persistent Redis-connected worker process. Vercel serverless functions cannot run persistent workers — they terminate after `res.end()`. When that feature lands, the architecture needs to split: Vercel handles on-demand audits; a separate persistent service (likely the Express backend) handles scheduled job workers. This is the clearest reason the Express backend is not throwaway code.
+BullMQ scheduled jobs (see [ROADMAP Phase 2](ROADMAP.md)) require a persistent Redis-connected worker process. Vercel serverless functions cannot run persistent workers — they terminate after `res.end()`. The architecture is now split: Vercel handles on-demand audits; the Express backend hosts the BullMQ worker (`backend/workers/auditWorker.js`), started automatically via dynamic import when `backend/server.js` starts. `POST /api/jobs` (and `GET /api/jobs`) enqueue and list scheduled audits, with job data persisted in Redis (`KV_URL`, ioredis TCP). This is the clearest reason the Express backend is not throwaway code.
 
 ---
 
-## 5. Streaming: why SSE not WebSockets?
+## 5. Job queue: scheduled audit flow
+
+Scheduled audits use BullMQ backed by Redis (`KV_URL`, ioredis TCP connection to Upstash/Railway).
+
+**Enqueue path (`POST /api/jobs`):**
+1. The Vercel serverless function authenticates the request, validates the target URL, and adds a job to the BullMQ queue in Redis.
+2. The job payload carries `{userId, targetId, url, device, runs}`. The function returns the job ID immediately — no audit runs synchronously.
+
+**Worker path (`backend/workers/auditWorker.js`):**
+1. `backend/server.js` dynamically imports the worker on startup. The worker connects to the same Redis queue and registers a `process` handler.
+2. When a job is dequeued, the worker launches Chrome via `chrome-launcher`, runs Lighthouse, and calls `api/lib/persistAuditRun.js` to write results into Neon Postgres — the same shared utility used by `api/lighthouse.js`.
+3. On success, the run row in Postgres transitions from `pending` → `complete`. On failure, BullMQ retries with exponential backoff.
+
+The key constraint: the worker must run in the Express backend (a persistent process), not in Vercel serverless functions, which terminate after `res.end()`. This is why the dual-backend split exists — see [ADR 0001](decisions/0001-dual-deployment-vercel-serverless-and-express.md).
+
+---
+
+## 6. Streaming: why SSE not WebSockets?
 
 A Lighthouse audit is a one-way broadcast: the server has information (progress, results) that it pushes to the client. The client never sends anything mid-audit. WebSockets are a bidirectional full-duplex channel — that's the wrong tool for a unidirectional stream.
 
@@ -219,7 +243,7 @@ The one real tradeoff: SSE is unidirectional. If you wanted to cancel an in-prog
 
 ---
 
-## 6. Where the bottlenecks are
+## 7. Where the bottlenecks are
 
 **Vercel 60-second timeout.** Lighthouse itself sets `maxWaitForLoad: 45000ms` (45 seconds per run). Multi-run audits on slow target sites hit 60 seconds quickly. 3 runs × 20s each = 60s exactly. Any retries, network hiccups, or slow page loads push this over. There's no graceful degradation — the function terminates and the SSE connection drops.
 
@@ -241,24 +265,26 @@ The one real tradeoff: SSE is unidirectional. If you wanted to cancel an in-prog
 
 ---
 
-## 7. What's NOT here yet
+## 8. What's NOT here yet
 
-**Authentication and persistence are now implemented** (Phase 1 complete, 2026-04-27). Logged-in users can run audits, close the tab, return to `/history`, and see saved results. Guests can still audit without an account — results are ephemeral.
+**Phase 1 complete** (2026-04-27) — authentication, persistence, and history. Logged-in users can run audits, close the tab, return to `/history`, and see saved results. Guests can still audit without an account — results are ephemeral.
 
-What remains unbuilt (as of Phase 1 completion):
+**Phase 2 partially complete** — the job queue infrastructure and trend visualization are live. Scheduled audit execution is wired but the UI for configuring schedules is not yet built.
 
-- **Rate limiting** — no per-IP or per-user quotas. Guest audits are entirely open. The realistic risk is Vercel usage cost on a viral day. Planned for Phase 4 via Redis token bucket.
-- **Scheduled / background jobs** — audits are triggered only by user action; no cron-style scheduled audits. Requires BullMQ + a persistent worker (the Express backend). Planned for Phase 2.
+What remains unbuilt:
+
+- **Scheduled audits UI** — users can't yet configure per-URL cron schedules from the frontend. The backend queue (`POST /api/jobs`) and worker are ready; the configuration UI is the missing piece.
+- **Regression detection** — no visual callout when a metric degrades vs. rolling baseline. Planned for Phase 2.
+- **Rate limiting** — no per-IP or per-user quotas. Guest audits are entirely open. Planned for Phase 4 via Redis token bucket.
 - **Audit cancellation** — no `DELETE /api/jobs/:id` or SSE close detection. An in-progress audit that the user navigates away from continues to completion server-side.
 - **Multi-tenancy / team workspaces** — all data is user-scoped; no team or organization sharing layer.
-- **Trend visualization** — the data exists in Postgres (runs + metrics over time) but the frontend has no time-series chart yet. Planned for Phase 2.
 - **Token refresh** — the JWT is a single 7-day access token. No refresh token, no sliding sessions. After expiry, the user is silently logged out.
 
 For the full phased plan — what's next, in what order, and what's deliberately out of scope — see [`docs/ROADMAP.md`](ROADMAP.md).
 
 ---
 
-## 8. Glossary
+## 9. Glossary
 
 **SSE (Server-Sent Events)**: A standard HTTP mechanism for one-way server-to-client streaming. The server holds a `200` response open and writes `data: ...\n\n` lines. The browser reads them incrementally. Simpler than WebSockets; works over standard HTTP proxies.
 
