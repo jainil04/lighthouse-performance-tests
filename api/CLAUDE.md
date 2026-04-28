@@ -65,6 +65,16 @@ Returns `{ exists: boolean }`. Used by the frontend's three-step auth flow to de
 
 Errors: `400` (missing email param), `500` (DB error).
 
+## AI summary endpoint
+
+### `POST /api/ai-summary`
+
+Auth is **required**. Returns 401 if token is missing or invalid. Calls OpenAI GPT-4.1.
+
+Two modes selected by `tableComparison` boolean in request body:
+- `false` — single-result summary: expects `{coreMetrics, scores, opportunities}`
+- `true` — comparison summary: expects `{allRunsData}` (array of run objects or CSV-derived rows)
+
 ## Audit endpoint
 
 ### `POST /api/lighthouse`
@@ -83,6 +93,8 @@ Auth is **optional**. Authenticated users get DB persistence; guests get results
 - `runs` — one row: `{device, status, runs_count: N}` (N = user-requested count, not N+1)
 - `metrics` — 10 rows per run: `performance`, `accessibility`, `best-practices`, `seo` (unit: `score`), `fcp`, `lcp`, `cls`, `tbt`, `si`, `tti` (unit: `ms` except `cls` which has no unit)
 - `run_artifacts` — one row with `lhr_json` (full Lighthouse result as JSONB); only when `auditView === 'full'`
+
+**10-run cap** — after marking the run complete, a single `DELETE ... WHERE id NOT IN (SELECT id ... ORDER BY created_at DESC LIMIT 10)` removes any runs beyond the 10 most recent for that user. The single-statement approach is effectively atomic.
 
 ## History endpoint
 

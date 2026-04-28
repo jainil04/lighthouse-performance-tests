@@ -18,111 +18,150 @@
         'flex items-center gap-3 p-4 border-b',
         isDarkMode ? 'border-gray-700' : 'border-gray-200'
       ]">
-      <div :class="[
-        'w-8 h-8 rounded-full flex items-center justify-center',
-        isDarkMode ? 'bg-purple-600' : 'bg-blue-500'
-      ]">
-        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-        </svg>
-      </div>
-      <div>
-        <h3 :class="[
-          'font-semibold text-lg',
-          isDarkMode ? 'text-white' : 'text-gray-900'
-        ]">AI Performance Analysis</h3>
-        <p :class="[
-          'text-sm',
-          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-        ]">Analyzing your Lighthouse audit data</p>
-      </div>
-      <!-- Loading indicator -->
-      <div v-if="isLoading" class="ml-auto">
         <div :class="[
-          'animate-spin rounded-full h-6 w-6 border-2 border-t-transparent',
-          isDarkMode ? 'border-purple-400' : 'border-blue-400'
-        ]"></div>
-      </div>
-    </div>
-
-    <!-- Content Area -->
-    <div class="p-6">
-      <!-- Loading State -->
-      <div v-if="isLoading" class="space-y-4">
-        <div :class="[
-          'flex items-center gap-3 p-4 rounded-lg',
-          isDarkMode ? 'bg-gray-800/50' : 'bg-blue-50/50'
+          'w-8 h-8 rounded-full flex items-center justify-center',
+          isDarkMode ? 'bg-purple-600' : 'bg-blue-500'
         ]">
-          <div :class="[
-            'animate-pulse w-2 h-2 rounded-full',
-            isDarkMode ? 'bg-purple-400' : 'bg-blue-400'
-          ]"></div>
-          <span :class="[
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+          </svg>
+        </div>
+        <div>
+          <h3 :class="[
+            'font-semibold text-lg',
+            isDarkMode ? 'text-white' : 'text-gray-900'
+          ]">AI Performance Analysis</h3>
+          <p :class="[
             'text-sm',
-            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-          ]">Processing your performance data...</span>
+            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+          ]">Analyzing your Lighthouse audit data</p>
         </div>
-
-        <!-- Skeleton lines -->
-        <div class="space-y-3">
-          <div v-for="i in 3" :key="i" :class="[
-            'h-4 rounded animate-pulse',
-            isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
-          ]" :style="{ width: `${85 - i * 10}%` }"></div>
+        <div class="ml-auto flex items-center gap-2">
+          <!-- Copy button — only when summary is loaded -->
+          <button
+            v-if="summary && !isLoading"
+            @click="copyToClipboard"
+            :title="copied ? 'Copied!' : 'Copy summary'"
+            :class="[
+              'p-1.5 rounded-lg transition-all duration-200',
+              isDarkMode ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+            ]"
+          >
+            <svg v-if="copied" class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+            </svg>
+          </button>
+          <!-- Loading indicator -->
+          <div v-if="isLoading">
+            <div :class="[
+              'animate-spin rounded-full h-6 w-6 border-2 border-t-transparent',
+              isDarkMode ? 'border-purple-400' : 'border-blue-400'
+            ]"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Summary Content -->
-      <div v-else-if="summary" class="space-y-4">
-        <div :class="[
-          'prose prose-sm max-w-none',
-          isDarkMode ? 'prose-invert' : ''
-        ]">
-          <!-- Format each line as a proper paragraph or list item -->
-          <div v-for="(line, index) in formattedLines" :key="index" class="mb-3">
-            <p v-if="line.type === 'paragraph'" :class="[
-              'leading-relaxed',
-              isDarkMode ? 'text-gray-200' : 'text-gray-700'
-            ]" v-html="line.content"></p>
-
-            <div v-else-if="line.type === 'bullet'" :class="[
-              'flex items-start gap-2 ml-4',
-              isDarkMode ? 'text-gray-300' : 'text-gray-600'
-            ]">
-              <span :class="[
-                'w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0',
-                isDarkMode ? 'bg-purple-400' : 'bg-blue-400'
-              ]"></span>
-              <span class="leading-relaxed" v-html="line.content"></span>
-            </div>
+      <!-- Content Area -->
+      <div class="p-6">
+        <!-- Sign-in gate -->
+        <div v-if="!user" class="flex flex-col items-center gap-4 py-4">
+          <div :class="[
+            'w-12 h-12 rounded-full flex items-center justify-center',
+            isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+          ]">
+            <svg class="w-6 h-6" :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+          </div>
+          <div class="text-center">
+            <p :class="['font-medium mb-1', isDarkMode ? 'text-gray-200' : 'text-gray-800']">Sign in to get an AI summary</p>
+            <p :class="['text-sm mb-3', isDarkMode ? 'text-gray-400' : 'text-gray-500']">Get AI-powered insights about your performance audit</p>
+            <RouterLink
+              to="/auth"
+              :class="['text-sm font-medium underline underline-offset-2', isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700']"
+            >Sign in</RouterLink>
           </div>
         </div>
 
-        <!-- AI Footer -->
-        <div :class="[
-          'flex items-center gap-2 pt-4 border-t text-xs',
-          isDarkMode ? 'border-gray-700 text-gray-500' : 'border-gray-200 text-gray-500'
-        ]">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-          Generated by AI • Based on your performance audit data
-        </div>
-      </div>
+        <!-- Loading State -->
+        <div v-else-if="isLoading" class="space-y-4">
+          <div :class="[
+            'flex items-center gap-3 p-4 rounded-lg',
+            isDarkMode ? 'bg-gray-800/50' : 'bg-blue-50/50'
+          ]">
+            <div :class="[
+              'animate-pulse w-2 h-2 rounded-full',
+              isDarkMode ? 'bg-purple-400' : 'bg-blue-400'
+            ]"></div>
+            <span :class="[
+              'text-sm',
+              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            ]">Processing your performance data...</span>
+          </div>
 
-      <!-- Empty State -->
-      <div v-else :class="[
-        'text-center py-8',
-        isDarkMode ? 'text-gray-400' : 'text-gray-500'
-      ]">
-        <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-        </svg>
-        <p>Getting AI-powered insights</p>
+          <!-- Skeleton lines -->
+          <div class="space-y-3">
+            <div v-for="i in 3" :key="i" :class="[
+              'h-4 rounded animate-pulse',
+              isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
+            ]" :style="{ width: `${85 - i * 10}%` }"></div>
+          </div>
+        </div>
+
+        <!-- Summary Content -->
+        <div v-else-if="summary" class="space-y-4">
+          <div :class="[
+            'prose prose-sm max-w-none',
+            isDarkMode ? 'prose-invert' : ''
+          ]">
+            <!-- Format each line as a proper paragraph or list item -->
+            <div v-for="(line, index) in formattedLines" :key="index" class="mb-3">
+              <p v-if="line.type === 'paragraph'" :class="[
+                'leading-relaxed',
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              ]" v-html="line.content"></p>
+
+              <div v-else-if="line.type === 'bullet'" :class="[
+                'flex items-start gap-2 ml-4',
+                isDarkMode ? 'text-gray-300' : 'text-gray-600'
+              ]">
+                <span :class="[
+                  'w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0',
+                  isDarkMode ? 'bg-purple-400' : 'bg-blue-400'
+                ]"></span>
+                <span class="leading-relaxed" v-html="line.content"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Footer -->
+          <div :class="[
+            'flex items-center gap-2 pt-4 border-t text-xs',
+            isDarkMode ? 'border-gray-700 text-gray-500' : 'border-gray-200 text-gray-500'
+          ]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            Generated by AI • Based on your performance audit data
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else :class="[
+          'text-center py-8',
+          isDarkMode ? 'text-gray-400' : 'text-gray-500'
+        ]">
+          <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+          </svg>
+          <p>Getting AI-powered insights</p>
+        </div>
       </div>
     </div>
   </div>
-</div>
 </template>
 
 <script setup>
@@ -136,11 +175,20 @@ const props = defineProps({
   compareTables: {
     type: Boolean,
     default: false
+  },
+  user: {
+    type: Object,
+    default: null
+  },
+  token: {
+    type: String,
+    default: null
   }
 })
 
 const summary = ref('');
 const isLoading = ref(false);
+const copied = ref(false);
 
 const formattedLines = computed(() => {
   if (!summary.value) return [];
@@ -163,7 +211,18 @@ const formattedLines = computed(() => {
     });
 });
 
+async function copyToClipboard() {
+  try {
+    await navigator.clipboard.writeText(summary.value);
+    copied.value = true;
+    setTimeout(() => { copied.value = false; }, 2000);
+  } catch (e) {
+    console.error('Failed to copy summary', e);
+  }
+}
+
 async function fetchSummary() {
+  if (!props.user) return;
   isLoading.value = true;
   try {
     const body = props.compareTables ?
@@ -179,13 +238,15 @@ async function fetchSummary() {
       }
     const res = await fetch('/api/ai-summary', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(props.token ? { 'Authorization': `Bearer ${props.token}` } : {})
+      },
       body: JSON.stringify(body)
     });
     if (res.ok) {
       const { summary: text } = await res.json();
       summary.value = text;
-      console.log('AI Response:', summary.value);
     }
   } catch (e) {
     console.error('Failed to get summary', e);
@@ -195,7 +256,7 @@ async function fetchSummary() {
 }
 
 onMounted(async () => {
-  if (props.allRunsData.length > 0) {
+  if (props.user && props.allRunsData.length > 0) {
     setTimeout(async () => {
       await fetchSummary();
     }, 5000);

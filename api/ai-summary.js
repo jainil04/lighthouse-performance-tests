@@ -1,9 +1,16 @@
 // api/ai-summary.js
+import { verifyToken } from './lib/auth.js';
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Only POST requests are allowed" });
     return;
+  }
+
+  try {
+    verifyToken(req);
+  } catch (err) {
+    return res.status(err.status || 401).json({ error: 'Authentication required' });
   }
 
   const { tableComparison, allRunsData, coreMetrics, scores, opportunities = {} } = req.body;

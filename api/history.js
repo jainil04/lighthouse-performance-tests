@@ -120,6 +120,7 @@ export default async function handler(req, res) {
       total: Number(countRow.count),
       page,
       limit,
+      cap: 10,
     });
   } catch (err) {
     console.error('[history]', err);

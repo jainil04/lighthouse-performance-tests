@@ -76,7 +76,12 @@ const menuItems = computed(() => {
     <!-- Right side - Auth + Theme toggler -->
     <div class="hidden md:flex items-center gap-2">
       <template v-if="user">
-        <span :class="['text-sm', isDarkMode ? 'text-gray-300' : 'text-gray-600']">{{ user.email }}</span>
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+            {{ user.email[0].toUpperCase() }}
+          </div>
+          <span :class="['text-sm', isDarkMode ? 'text-gray-300' : 'text-gray-600']">{{ user.email }}</span>
+        </div>
         <Button
           label="Log out"
           severity="secondary"
@@ -87,10 +92,11 @@ const menuItems = computed(() => {
       </template>
       <Button
         v-else
-        label="Login"
+        label="Sign in"
         severity="secondary"
         size="small"
-        outlined
+        text
+        icon="pi pi-sign-in"
         @click="router.push('/auth')"
       />
       <ThemeToggler

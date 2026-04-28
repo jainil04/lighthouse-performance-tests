@@ -512,4 +512,17 @@ async function persistAuditRun({ userId, url, device, runs, auditView, finalScor
   await sql`
     UPDATE runs SET status = 'complete', completed_at = NOW() WHERE id = ${run.id}
   `;
+
+  // Enforce 10-run cap: delete any runs beyond the 10 most recent for this user.
+  // Single DELETE keeps the operation atomic — no window where the user has 11 rows.
+  await sql`
+    DELETE FROM runs
+    WHERE user_id = ${userId}
+    AND id NOT IN (
+      SELECT id FROM runs
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+      LIMIT 10
+    )
+  `;
 }

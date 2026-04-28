@@ -4,11 +4,13 @@ import ThrottleSelector from '../ui/forms/ThrottleSelector.vue'
 import RunsSelector from '../ui/forms/RunsSelector.vue'
 import AuditViewSelector from '../ui/forms/AuditViewSelector.vue'
 import ThemeToggler from './ThemeToggler.vue'
-import { onMounted, onUnmounted, inject } from 'vue'
+import { onMounted, onUnmounted, inject, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
 const route = useRoute()
+const user = inject('user')
+const logout = inject('logout')
 
 const props = defineProps({
   isOpen: {
@@ -268,6 +270,40 @@ const isActiveRoute = (path) => {
               @theme-change="handleThemeChange"
             />
           </div>
+        </div>
+
+        <!-- Auth (Mobile Only) -->
+        <div class="lg:hidden">
+          <div :class="['h-px w-full mb-4', isDarkMode ? 'bg-gray-700' : 'bg-gray-200']"></div>
+
+          <!-- Logged in -->
+          <div v-if="user" class="flex items-center justify-between">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-7 h-7 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center text-white text-xs font-semibold">
+                {{ user.email[0].toUpperCase() }}
+              </div>
+              <span :class="['text-sm truncate', isDarkMode ? 'text-gray-300' : 'text-gray-700']">{{ user.email }}</span>
+            </div>
+            <button
+              @click="logout"
+              :class="['text-sm font-medium flex-shrink-0 ml-2', isDarkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700']"
+            >
+              Sign out
+            </button>
+          </div>
+
+          <!-- Logged out -->
+          <button
+            v-else
+            @click="handleNavigation('/auth')"
+            :class="[
+              'w-full flex items-center justify-center gap-2 p-3 rounded-xl transition-all duration-200 text-sm font-medium',
+              isDarkMode ? 'text-blue-400 hover:bg-gray-700' : 'text-blue-600 hover:bg-blue-50'
+            ]"
+          >
+            <i class="pi pi-sign-in"></i>
+            Sign in
+          </button>
         </div>
       </div>
     </nav>
