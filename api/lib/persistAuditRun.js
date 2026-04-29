@@ -60,4 +60,6 @@ export async function persistAuditRun({ userId, url, device, runs, auditView, fi
       LIMIT 10
     )
   `;
+
+  return { runId: run.id, targetId: target.id };
 }

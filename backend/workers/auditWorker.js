@@ -7,6 +7,7 @@ import {
   calculateAverages,
 } from '../../api/lighthouse.js';
 import { persistAuditRun } from '../../api/lib/persistAuditRun.js';
+import { checkAlerts } from '../../api/lib/checkAlerts.js';
 
 const noop = () => {};
 
@@ -75,8 +76,16 @@ const worker = new Worker('audit', async (job) => {
     const finalScores  = averages ? averages.scores  : runResults[0].scores;
     const finalMetrics = averages ? averages.metrics : runResults[0].metrics;
 
-    await persistAuditRun({ userId, url, device, runs, auditView: 'standard', finalScores, finalMetrics, lhrObjects });
+    const { runId, targetId } = await persistAuditRun({ userId, url, device, runs, auditView: 'standard', finalScores, finalMetrics, lhrObjects });
     console.log(`[auditWorker] Job ${job.id} completed for ${url}`);
+
+    // Alert delivery is best-effort: a failure here must not fail the job,
+    // because the audit itself succeeded and results are already persisted.
+    try {
+      await checkAlerts({ runId, targetId, userId, metrics: { ...finalScores, ...finalMetrics }, url });
+    } catch (err) {
+      console.error(`[auditWorker] checkAlerts error for job ${job.id}:`, err.message);
+    }
   } finally {
     try { await browser.close(); } catch (e) { console.error('[auditWorker] browser close error:', e); }
   }

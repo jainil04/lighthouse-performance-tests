@@ -58,6 +58,24 @@ window.dispatchEvent(new CustomEvent('audit-start'))
 
 Every ref is reset at the start of `runAudit()`. If you add a new ref, add it to the reset block.
 
+## useAlertConfigs.js — alert threshold CRUD
+
+CRUD composable for `alert_configs`. Hits `GET/POST /api/alerts` and `PATCH/DELETE /api/alerts/:id`. Used exclusively in `HistoryView.vue`.
+
+### API
+
+| Export | Signature | Notes |
+|--------|-----------|-------|
+| `configs` | `ref([])` | Array of alert config objects; updated by every mutation |
+| `loading` | `ref(false)` | Set during `fetchAlerts` only |
+| `error` | `ref(null)` | Set on fetch failure; cleared on next fetch |
+| `fetchAlerts(targetId)` | `(uuid) → void` | Fetches configs for a specific target. Returns early and clears `configs` if `targetId` is falsy. |
+| `createAlert(fields)` | `({target_id, metric, threshold, comparison}) → config` | Prepends the returned config to `configs`. Throws on API error (including 409 duplicate). |
+| `updateAlert(id, patch)` | `(uuid, {threshold?, comparison?, enabled?}) → config` | Updates the matching entry in `configs` in-place. |
+| `deleteAlert(id)` | `(uuid) → void` | Removes the entry from `configs`. |
+
+All functions read `lh_token` from `localStorage` on each call — no need to pass the token explicitly.
+
 ## New composable pattern
 
 ```js

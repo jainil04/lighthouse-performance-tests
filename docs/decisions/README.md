@@ -15,3 +15,5 @@ To add a new ADR: copy the structure from an existing one, pick the next number,
 | [0005](0005-multi-run-aggregation-strategy.md) | Multi-run aggregation: scores/metrics averaged across runs, opportunities taken from run 1 only — asymmetry documented and deferred | Proposed |
 | [0006](0006-warmup-run-discarding.md) | Warmup run discarding — always run N+1, discard first; warm Chrome + DNS before real runs | Accepted |
 | [0007](0007-auth-optional.md) | Authentication is optional — guests can run audits; only authenticated users get DB persistence | Accepted |
+| [0008](0008-email-provider-resend.md) | Email provider: Resend over Postmark — free tier economics, DX, dev-stub fallback, domain verification as one-way door | Accepted |
+| [0009](0009-alerts-scheduled-only.md) | Alerts fire for scheduled audits only in v1 — on-demand path deferred; UX inline notice required to surface the gap | Accepted |

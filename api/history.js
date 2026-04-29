@@ -32,6 +32,7 @@ export default async function handler(req, res) {
       runs = await sql`
         SELECT
           r.id,
+          t.id AS target_id,
           t.url,
           r.device,
           r.status,
@@ -52,7 +53,7 @@ export default async function handler(req, res) {
         JOIN targets t ON t.id = r.target_id
         LEFT JOIN metrics m ON m.run_id = r.id
         WHERE r.user_id = ${userId} AND t.url = ${urlFilter}
-        GROUP BY r.id, t.url, r.device, r.status, r.created_at, r.completed_at, r.runs_count
+        GROUP BY r.id, t.id, t.url, r.device, r.status, r.created_at, r.completed_at, r.runs_count
         ORDER BY r.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -66,6 +67,7 @@ export default async function handler(req, res) {
       runs = await sql`
         SELECT
           r.id,
+          t.id AS target_id,
           t.url,
           r.device,
           r.status,
@@ -86,7 +88,7 @@ export default async function handler(req, res) {
         JOIN targets t ON t.id = r.target_id
         LEFT JOIN metrics m ON m.run_id = r.id
         WHERE r.user_id = ${userId}
-        GROUP BY r.id, t.url, r.device, r.status, r.created_at, r.completed_at, r.runs_count
+        GROUP BY r.id, t.id, t.url, r.device, r.status, r.created_at, r.completed_at, r.runs_count
         ORDER BY r.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -95,6 +97,7 @@ export default async function handler(req, res) {
     const n = (v) => v !== null && v !== undefined ? Number(v) : null;
     const formatted = runs.map(r => ({
       id: r.id,
+      target_id: Number(r.target_id),
       url: r.url,
       device: r.device,
       runs_count: r.runs_count,

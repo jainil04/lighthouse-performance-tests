@@ -24,6 +24,10 @@
   ],
   "routes": [
     {
+      "src": "/api/alerts/([^/]+)",
+      "dest": "/api/alerts.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1.js"
     }

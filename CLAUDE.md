@@ -44,14 +44,17 @@ Browser → Vue 3 SPA (src/)
 | Layer | Path | Details |
 |---|---|---|
 | Vercel serverless | `api/` | `puppeteer-core` + `@sparticuz/chromium`; auth + DB persistence — `api/CLAUDE.md` |
-| Express server | `backend/` | `chrome-launcher` (local system Chrome); no auth layer — `backend/CLAUDE.md` |
+| Express server | `backend/` | `chrome-launcher` (local system Chrome); `requireAuth` (from `api/lib/auth.js`) applied to `/api/lighthouse` — `backend/CLAUDE.md` |
 | Vue 3 SPA | `src/` | `src/CLAUDE.md` |
 | Auth helpers | `api/lib/` | `auth.js` (JWT verify), `db.js` (Neon SQL client) |
-| DB persistence util | `api/lib/persistAuditRun.js` | shared helper used by `api/lighthouse.js` and the BullMQ worker |
+| DB persistence util | `api/lib/persistAuditRun.js` | shared helper used by `api/lighthouse.js` and the BullMQ worker; returns `{ runId, targetId }` |
+| Alert check util | `api/lib/checkAlerts.js` | called by the BullMQ worker after each scheduled audit; evaluates `alert_configs` and sends email via `email.js` |
+| Email helper | `api/lib/email.js` | thin Resend wrapper; dev-stub when `RESEND_API_KEY` is unset |
 | Auth endpoints | `api/auth/` | `signup.js`, `login.js`, `check-email.js` |
-| History endpoint | `api/history.js` | paginated audit history (authenticated only) |
+| History endpoint | `api/history.js` | paginated audit history (authenticated only); response includes `target_id` per run |
 | Jobs endpoints | `api/jobs.js` | `POST` enqueues a repeatable BullMQ audit job (`repeat: { pattern: schedule }`) and upserts the target row with the schedule column set; `GET` returns all scheduled targets for the authenticated user. Server-side: max 5 scheduled URLs per user, schedule must be one of `"0 9 * * *"` (daily) / `"0 9 * * 1"` (weekly) / `"0 9 1 * *"` (monthly). Schedule UI lives in `HistoryView.vue` — appears when a URL filter is active and the user is logged in |
-| BullMQ worker | `backend/workers/auditWorker.js` | persistent process; started automatically via dynamic import in `backend/server.js` |
+| Alerts endpoint | `api/alerts.js` | CRUD for alert threshold configs (auth required). `GET /api/alerts?target_id=...`, `POST /api/alerts`, `PATCH /api/alerts/:id`, `DELETE /api/alerts/:id` (soft-delete). Allowed metrics: `performance`, `accessibility`, `best_practices`, `seo`, `fcp`, `lcp`, `cls`, `tbt`, `si`, `tti`. Comparison: `'below'` or `'above'`. Alert UI in `HistoryView.vue` below schedule section |
+| BullMQ worker | `backend/workers/auditWorker.js` | persistent process; started automatically via dynamic import in `backend/server.js`; calls `checkAlerts()` after each scheduled audit |
 | DB migrations | `migrations/` | `node-pg-migrate`; run with `npm run db:migrate` |
 
 ## Cross-cutting rules
@@ -72,13 +75,17 @@ JWT_SECRET        # Required for auth — 64-byte random hex string
                   # generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 KV_URL            # Required for BullMQ job queue — Upstash/Railway Redis, ioredis TCP format
                   # e.g. redis://default:password@host:port
+RESEND_API_KEY    # Optional — Resend transactional email for alert notifications
+                  # Without it, email.js logs the payload and returns {id:'dev-stub'} (local dev works without a key)
+RESEND_FROM_EMAIL # Optional — sending address (default: alerts@lighthouse-monitor.dev)
+                  # Must match a domain verified in the Resend dashboard before emails deliver
 ```
 
 `VITE_API_URL` and all `HF_*` Hugging Face vars exist in `.env` but are unused — ignore them.
 
 ## Deployment
 
-`vercel.json`: builds glob `api/{*.js,auth/*.js}` → `@vercel/node`, 60s timeout, 1024MB RAM (scoped glob keeps deployed function count under Vercel Hobby's 12-function limit). Frontend → `@vercel/static-build`. Catch-all route `/api/(.*)` → `/api/$1.js`.
+`vercel.json`: builds glob `api/{*.js,auth/*.js}` → `@vercel/node`, 60s timeout, 1024MB RAM (scoped glob keeps deployed function count under Vercel Hobby's 12-function limit; currently 8). Frontend → `@vercel/static-build`. Routes: an explicit path-param route `{ "src": "/api/alerts/([^/]+)", "dest": "/api/alerts.js" }` appears before the catch-all `{ "src": "/api/(.*)", "dest": "/api/$1.js" }` — any endpoint with URL path parameters needs its own explicit route entry before the catch-all (the catch-all maps `/api/X/Y` to `/api/X/Y.js`, which doesn't exist).
 
 ## Further reading
 

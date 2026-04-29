@@ -1,6 +1,7 @@
 <script setup>
-import { ref, inject, onMounted, computed, watch, onUnmounted } from 'vue'
+import { ref, inject, onMounted, computed, watch, onUnmounted, reactive } from 'vue'
 import { useAuditHistory } from '../composables/useAuditHistory.js'
+import { useAlertConfigs } from '../composables/useAlertConfigs.js'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Paginator from 'primevue/paginator'
@@ -189,6 +190,131 @@ const removeSchedule = () => {
   comingSoonVisible.value = true
   setTimeout(() => { comingSoonVisible.value = false }, 3000)
 }
+
+// ── Alerts ─────────────────────────────────────────────────────────────────
+const {
+  configs: alertConfigs,
+  loading: alertsLoading,
+  error: alertsError,
+  fetchAlerts,
+  createAlert,
+  updateAlert,
+  deleteAlert,
+} = useAlertConfigs()
+
+const filteredTargetId = computed(() =>
+  urlFilter.value.trim() && runs.value.length > 0 ? (runs.value[0]?.target_id ?? null) : null
+)
+
+const showAlerts = computed(() =>
+  !!urlFilter.value.trim() && !!token.value && filteredTargetId.value !== null
+)
+
+const ALERT_METRICS = [
+  { value: 'performance',    label: 'Performance' },
+  { value: 'accessibility',  label: 'Accessibility' },
+  { value: 'best_practices', label: 'Best Practices' },
+  { value: 'seo',            label: 'SEO' },
+  { value: 'fcp',            label: 'FCP' },
+  { value: 'lcp',            label: 'LCP' },
+  { value: 'cls',            label: 'CLS' },
+  { value: 'tbt',            label: 'TBT' },
+  { value: 'si',             label: 'Speed Index' },
+  { value: 'tti',            label: 'TTI' },
+]
+
+const SCORE_METRICS = new Set(['performance', 'accessibility', 'best_practices', 'seo'])
+
+const availableMetrics = computed(() => {
+  const used = new Set(alertConfigs.value.map(c => c.metric))
+  return ALERT_METRICS.filter(m => !used.has(m.value))
+})
+
+// Per-row edit state keyed by config id
+const alertEdits = reactive({})
+
+const initAlertEdit = (config) => {
+  if (!alertEdits[config.id]) {
+    alertEdits[config.id] = {
+      threshold: config.threshold,
+      comparison: config.comparison,
+      enabled: config.enabled,
+      saving: false,
+      error: null,
+    }
+  }
+}
+
+watch(alertConfigs, (newConfigs) => {
+  for (const c of newConfigs) initAlertEdit(c)
+}, { immediate: true })
+
+const handleSaveAlert = async (configId) => {
+  const edit = alertEdits[configId]
+  if (!edit || edit.saving) return
+  edit.saving = true
+  edit.error = null
+  try {
+    await updateAlert(configId, {
+      threshold: Number(edit.threshold),
+      comparison: edit.comparison,
+      enabled: edit.enabled,
+    })
+  } catch (err) {
+    edit.error = err.message
+  } finally {
+    edit.saving = false
+  }
+}
+
+const handleDeleteAlert = async (configId) => {
+  const edit = alertEdits[configId]
+  if (edit) edit.error = null
+  try {
+    await deleteAlert(configId)
+    delete alertEdits[configId]
+  } catch (err) {
+    if (alertEdits[configId]) alertEdits[configId].error = err.message
+  }
+}
+
+const newAlert = reactive({ metric: '', threshold: '', comparison: 'below', submitting: false, error: null })
+
+const onNewAlertMetricChange = () => {
+  // Default comparison: 'below' for score metrics, 'above' for CWV/time metrics
+  newAlert.comparison = SCORE_METRICS.has(newAlert.metric) ? 'below' : 'above'
+}
+
+const handleAddAlert = async () => {
+  if (!newAlert.metric || newAlert.threshold === '' || newAlert.submitting) return
+  if (!filteredTargetId.value) return
+  newAlert.submitting = true
+  newAlert.error = null
+  try {
+    await createAlert({
+      target_id: filteredTargetId.value,
+      metric: newAlert.metric,
+      threshold: Number(newAlert.threshold),
+      comparison: newAlert.comparison,
+    })
+    newAlert.metric = ''
+    newAlert.threshold = ''
+    newAlert.comparison = 'below'
+  } catch (err) {
+    newAlert.error = err.message
+  } finally {
+    newAlert.submitting = false
+  }
+}
+
+// Re-fetch alerts when URL filter + runs change
+watch([currentFilterUrl, runs], ([url, newRuns]) => {
+  if (url && newRuns.length > 0 && token.value) {
+    fetchAlerts(newRuns[0].target_id)
+  } else {
+    alertConfigs.value = []
+  }
+})
 
 onMounted(() => {
   load(1)
@@ -595,6 +721,178 @@ onUnmounted(() => {
         class="mt-4"
         @page="onPageChange"
       />
+
+      <!-- ── Alert thresholds ─────────────────────────────────────────────── -->
+      <div
+        v-if="showAlerts"
+        :class="['mt-8 rounded-lg border p-5', isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200']"
+      >
+        <h3 :class="['text-base font-semibold mb-1', isDarkMode ? 'text-white' : 'text-gray-900']">
+          Alert thresholds
+        </h3>
+        <p :class="['text-xs mb-4', isDarkMode ? 'text-gray-400' : 'text-gray-500']">
+          Email alerts fire when a scheduled audit breaches a threshold.
+        </p>
+
+        <!-- Inline notice: no schedule active for this URL -->
+        <div
+          v-if="!isAlreadyScheduled"
+          :class="['flex items-start gap-2 text-sm mb-4 p-3 rounded-lg', isDarkMode ? 'bg-amber-900/40 text-amber-300 border border-amber-700' : 'bg-amber-50 text-amber-800 border border-amber-200']"
+        >
+          <i class="pi pi-info-circle mt-0.5 shrink-0" />
+          <span>Alerts only fire for scheduled audits. Enable a schedule above to receive alerts.</span>
+        </div>
+
+        <!-- Loading -->
+        <div v-if="alertsLoading" :class="['text-sm', isDarkMode ? 'text-gray-400' : 'text-gray-500']">
+          Loading alerts…
+        </div>
+
+        <!-- Error -->
+        <div
+          v-else-if="alertsError"
+          :class="['text-sm p-3 rounded-lg', isDarkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800']"
+        >
+          {{ alertsError }}
+        </div>
+
+        <template v-else>
+          <!-- Existing alert config rows -->
+          <div class="space-y-2 mb-4">
+            <div
+              v-for="config in alertConfigs"
+              :key="config.id"
+              :class="['flex flex-wrap items-center gap-2 rounded-lg px-3 py-2', isDarkMode ? 'bg-gray-700' : 'bg-gray-50']"
+            >
+              <!-- Metric label -->
+              <span
+                :class="['text-sm font-medium w-32 shrink-0', isDarkMode ? 'text-gray-200' : 'text-gray-700']"
+              >
+                {{ ALERT_METRICS.find(m => m.value === config.metric)?.label ?? config.metric }}
+              </span>
+
+              <!-- Comparison -->
+              <select
+                v-if="alertEdits[config.id]"
+                v-model="alertEdits[config.id].comparison"
+                :class="['text-sm rounded border px-2 py-1', isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-white border-gray-300 text-gray-700']"
+              >
+                <option value="below">drops below</option>
+                <option value="above">rises above</option>
+              </select>
+
+              <!-- Threshold -->
+              <input
+                v-if="alertEdits[config.id]"
+                v-model="alertEdits[config.id].threshold"
+                type="number"
+                min="0"
+                step="any"
+                :class="['text-sm rounded border px-2 py-1 w-24', isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-white border-gray-300 text-gray-700']"
+              />
+
+              <!-- Enabled toggle -->
+              <Button
+                v-if="alertEdits[config.id]"
+                :label="alertEdits[config.id].enabled ? 'Enabled' : 'Disabled'"
+                :severity="alertEdits[config.id].enabled ? 'primary' : 'secondary'"
+                size="small"
+                text
+                @click="alertEdits[config.id].enabled = !alertEdits[config.id].enabled"
+              />
+
+              <div class="flex gap-1 ml-auto">
+                <Button
+                  label="Save"
+                  size="small"
+                  :loading="alertEdits[config.id]?.saving"
+                  :disabled="alertEdits[config.id]?.saving"
+                  @click="handleSaveAlert(config.id)"
+                />
+                <Button
+                  icon="pi pi-trash"
+                  size="small"
+                  severity="danger"
+                  text
+                  aria-label="Delete alert"
+                  @click="handleDeleteAlert(config.id)"
+                />
+              </div>
+
+              <!-- Per-row error -->
+              <p
+                v-if="alertEdits[config.id]?.error"
+                :class="['w-full text-xs', isDarkMode ? 'text-red-400' : 'text-red-600']"
+              >
+                {{ alertEdits[config.id].error }}
+              </p>
+            </div>
+
+            <p
+              v-if="alertConfigs.length === 0"
+              :class="['text-sm', isDarkMode ? 'text-gray-400' : 'text-gray-500']"
+            >
+              No alerts configured yet.
+            </p>
+          </div>
+
+          <!-- Add new alert -->
+          <div
+            v-if="availableMetrics.length > 0"
+            :class="['flex flex-wrap items-center gap-2 pt-3 border-t', isDarkMode ? 'border-gray-700' : 'border-gray-200']"
+          >
+            <select
+              v-model="newAlert.metric"
+              :class="['text-sm rounded border px-2 py-1', isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-white border-gray-300 text-gray-700']"
+              @change="onNewAlertMetricChange"
+            >
+              <option value="">Metric…</option>
+              <option v-for="m in availableMetrics" :key="m.value" :value="m.value">
+                {{ m.label }}
+              </option>
+            </select>
+
+            <select
+              v-model="newAlert.comparison"
+              :class="['text-sm rounded border px-2 py-1', isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-white border-gray-300 text-gray-700']"
+            >
+              <option value="below">drops below</option>
+              <option value="above">rises above</option>
+            </select>
+
+            <input
+              v-model="newAlert.threshold"
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Threshold"
+              :class="['text-sm rounded border px-2 py-1 w-28', isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500' : 'bg-white border-gray-300 text-gray-700']"
+            />
+
+            <Button
+              label="Add alert"
+              size="small"
+              :disabled="!newAlert.metric || newAlert.threshold === '' || newAlert.submitting"
+              :loading="newAlert.submitting"
+              @click="handleAddAlert"
+            />
+
+            <p
+              v-if="newAlert.error"
+              :class="['w-full text-xs', isDarkMode ? 'text-red-400' : 'text-red-600']"
+            >
+              {{ newAlert.error }}
+            </p>
+          </div>
+
+          <p
+            v-else-if="alertConfigs.length > 0"
+            :class="['text-xs mt-3', isDarkMode ? 'text-gray-500' : 'text-gray-400']"
+          >
+            All metrics are configured.
+          </p>
+        </template>
+      </div>
     </template>
 
     <!-- Schedule modal -->

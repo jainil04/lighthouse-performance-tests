@@ -1,6 +1,11 @@
 # api/CLAUDE.md
 
-Vercel serverless functions. Each file exports one default handler. Route-to-file mapping is handled by the catch-all route in `vercel.json`: `{ "src": "/api/(.*)", "dest": "/api/$1.js" }`. Subdirectory files work automatically — `api/auth/signup.js` is reachable at `POST /api/auth/signup`.
+Vercel serverless functions. Each file exports one default handler. Route-to-file mapping uses two rules in `vercel.json`:
+
+1. **Path-param route** (explicit, before catch-all): `{ "src": "/api/alerts/([^/]+)", "dest": "/api/alerts.js" }` — required because the catch-all cannot handle nested segments; `/api/alerts/some-uuid` would otherwise try to resolve `api/alerts/some-uuid.js`.
+2. **Catch-all**: `{ "src": "/api/(.*)", "dest": "/api/$1.js" }` — handles all other endpoints.
+
+Any future endpoint that takes URL path parameters (e.g., `/api/r/:slug` for sharing) needs its own explicit route entry added before the catch-all in `vercel.json`. Subdirectory files work automatically via the catch-all — `api/auth/signup.js` is reachable at `POST /api/auth/signup`.
 
 ## Handler signature
 
@@ -14,6 +19,28 @@ export default async function handler(req, res) {
 ```
 
 ## Library modules
+
+### `api/lib/email.js` — Resend email wrapper
+
+```js
+import { sendAlertEmail } from './lib/email.js'
+
+await sendAlertEmail({ to, url, metric, value, threshold, comparison, runId })
+```
+
+If `process.env.RESEND_API_KEY` is unset, logs the payload and returns `{id: 'dev-stub'}` — never throws. Throws on Resend API errors so the caller can record `email_error`.
+
+### `api/lib/checkAlerts.js` — alert evaluation + email dispatch
+
+```js
+import { checkAlerts } from './lib/checkAlerts.js'
+
+await checkAlerts({ runId, targetId, userId, metrics, url })
+```
+
+`metrics` is a flat object containing both score keys (`performance`, `accessibility`, `bestPractices`, `seo`) and CWV keys (`firstContentfulPaint`, `largestContentfulPaint`, etc.) — accepts both camelCase CWV keys and shorthand (`fcp`, `lcp`, etc.). Loaded alert configs are evaluated per metric. Each breach creates or updates an `alert_events` row (insert-first idempotency: a crash between insert and send retries on the next scheduled audit run rather than silently dropping). Each config is wrapped in try/catch — one failure does not abort the loop.
+
+Allowed metric values in `alert_configs.metric`: `performance`, `accessibility`, `best_practices`, `seo`, `fcp`, `lcp`, `cls`, `tbt`, `si`, `tti`.
 
 ### `api/lib/db.js` — Neon SQL client
 
@@ -133,6 +160,36 @@ Response:
 
 Errors: `401` (missing/invalid token), `500` (DB error).
 
+Response includes `target_id` (UUID) per run — used by the frontend to scope alert config requests.
+
+## Jobs endpoint
+
+### `GET /api/jobs` + `POST /api/jobs`
+
+Auth is **required** for both.
+
+`GET` returns all scheduled targets for the authenticated user (`schedule IS NOT NULL`).
+
+`POST` body: `{ url, device, runs, schedule }`. Validates schedule against the whitelist (`"0 9 * * *"` daily / `"0 9 * * 1"` weekly / `"0 9 1 * *"` monthly), enforces a max-5-scheduled-URLs-per-user cap, upserts the target row with the `schedule` column set, and enqueues a BullMQ repeatable job (`repeat: { pattern: schedule }`).
+
+Errors: `400` (missing/invalid fields, schedule limit reached), `401`, `500`.
+
+## Alerts endpoint
+
+### `GET /api/alerts` + `POST /api/alerts` + `PATCH /api/alerts/:id` + `DELETE /api/alerts/:id`
+
+Auth is **required** for all verbs. `PATCH` and `DELETE` use URL path parameters — they are routed by the explicit `vercel.json` entry before the catch-all (see routing note at the top of this file).
+
+`GET /api/alerts?target_id=<uuid>` — returns non-soft-deleted alert configs for the user, optionally filtered by target.
+
+`POST /api/alerts` body: `{ target_id, metric, threshold, comparison }`. Validates target ownership, metric whitelist (`performance`, `accessibility`, `best_practices`, `seo`, `fcp`, `lcp`, `cls`, `tbt`, `si`, `tti`), and comparison (`'below'` or `'above'`). Partial unique index on `(target_id, metric) WHERE deleted_at IS NULL` rejects duplicates with `409`.
+
+`PATCH /api/alerts/:id` body: `{ threshold?, comparison?, enabled? }`. Validates ownership; rejects if `deleted_at IS NOT NULL`.
+
+`DELETE /api/alerts/:id` — soft-deletes: sets `deleted_at = NOW()`. Validates ownership.
+
+Errors: `400` (validation), `401`, `404` (not found or wrong owner), `409` (duplicate active metric), `410` (already deleted), `500`.
+
 ## SSE — event format
 
 `lighthouse.js` uses a single POST response as an SSE stream. Format is strict — do not deviate:
@@ -222,8 +279,9 @@ process.env.LIGHTHOUSE_LOCALE = 'en-US'
 
 ## Adding a new endpoint
 
-1. Create `api/<name>.js` with a default handler export — the catch-all route in `vercel.json` handles it automatically
-2. If it needs auth, import `verifyToken` from `./lib/auth.js`
-3. If it needs DB, import `sql` from `./lib/db.js`
-4. If it performs audits, mirror the logic in `backend/routes/lighthouse.js` and `backend/services/lighthouseService.js`
-5. If it streams SSE, follow the event schema above exactly
+1. Create `api/<name>.js` with a default handler export — the catch-all route in `vercel.json` handles it automatically for flat paths (`/api/<name>`)
+2. **If the endpoint has URL path parameters** (e.g., `/api/<name>/:id`), add an explicit route entry in `vercel.json` *before* the catch-all: `{ "src": "/api/<name>/([^/]+)", "dest": "/api/<name>.js" }`. Parse the param from `req.url` inside the handler — parse UUIDs with a UUID regex, not `\d+` or `Number()`.
+3. If it needs auth, import `verifyToken` from `./lib/auth.js`
+4. If it needs DB, import `sql` from `./lib/db.js`
+5. If it performs audits, mirror the logic in `backend/routes/lighthouse.js` and `backend/services/lighthouseService.js`
+6. If it streams SSE, follow the event schema above exactly

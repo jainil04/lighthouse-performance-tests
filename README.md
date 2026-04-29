@@ -16,6 +16,7 @@ A full-stack web performance audit tool. Enter a URL, choose a device profile an
 | Database | Neon Postgres (`@neondatabase/serverless` — HTTP-based, serverless-compatible) |
 | Auth | JWT (`jsonwebtoken`) + bcrypt; optional on the audit endpoint (guests can audit without an account) |
 | AI summary | OpenAI GPT-4.1 |
+| Email alerts | Resend (transactional email; fires on scheduled audit threshold breaches) |
 | Streaming | Server-Sent Events over HTTP (not WebSockets) |
 | Deployment | Vercel (frontend + serverless functions) |
 
@@ -47,8 +48,11 @@ Requires Node 22.x. Copy `.env.example` to `.env` and fill in:
 | `OPENAI_API_KEY` | AI summaries (`/api/ai-summary`) |
 | `DATABASE_URL` | Auth + history (Neon Postgres connection string) |
 | `JWT_SECRET` | Token signing — generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
+| `KV_URL` | Scheduled audits — Upstash/Railway Redis, ioredis TCP format |
+| `RESEND_API_KEY` | Email alerts (optional — falls back to a dev stub that logs instead of sending) |
+| `RESEND_FROM_EMAIL` | Alert sender address (optional — must match a Resend-verified domain in production) |
 
-Auth and history features are disabled if `DATABASE_URL` / `JWT_SECRET` are not set. The audit engine works without them.
+Auth and history features are disabled if `DATABASE_URL` / `JWT_SECRET` are not set. The audit engine works without them. Email alerts work without `RESEND_API_KEY` in development (payloads are logged; no email is sent).
 
 ---
 
@@ -67,7 +71,7 @@ For a full architectural narrative — including why SSE not WebSockets, why two
 
 ## Roadmap
 
-Phase 0 (documentation and cleanup) and Phase 1 (Postgres persistence + JWT auth) are complete. Phase 2 (async scheduled audits, BullMQ, trend visualization) is next.
+Phases 0–2 are complete. Phase 3 notifications (email alerts on scheduled audit threshold breaches) are shipped.
 
 → See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full phased plan, status of each item, and what's deliberately out of scope.
 
@@ -84,3 +88,5 @@ Major technical decisions are documented as ADRs in [`docs/decisions/`](docs/dec
 - [0005](docs/decisions/0005-multi-run-aggregation-strategy.md) — multi-run aggregation asymmetry
 - [0006](docs/decisions/0006-warmup-run-discarding.md) — warmup run discarding (N+1 runs, first discarded)
 - [0007](docs/decisions/0007-auth-optional.md) — authentication is optional; guests can run audits
+- [0008](docs/decisions/0008-email-provider-resend.md) — Resend as email provider (vs Postmark)
+- [0009](docs/decisions/0009-alerts-scheduled-only.md) — alerts fire for scheduled audits only (on-demand deferred)

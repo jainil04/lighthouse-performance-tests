@@ -99,6 +99,11 @@ On success, calls `inject('login')(token, user)` and pushes to `/`. Uses PrimeVu
 
 Paginated table of past audits for the authenticated user. Calls `GET /api/history` via `useAuditHistory`. Displays: URL, device, runs count, date, four category score badges, and six CWV metric badges (FCP, LCP, SI, CLS, TBT, TTI) color-coded against Google's official thresholds. URL filter via `InputText`. PrimeVue `DataTable` + `Paginator` + `Skeleton` for loading state. Uses `inject('isDarkMode')`.
 
+When a URL filter is active:
+- **Schedule UI** — a "Schedule" button opens a modal to configure Daily/Weekly/Monthly cron audits via `POST /api/jobs`. Shows "Scheduled ✓" badge when active. Max 5 scheduled URLs per user enforced in both the API and the UI.
+- **Trend chart** — line chart (Chart.js) of Performance, FCP, LCP, CLS, TBT over time; shown when ≥2 runs exist. `regressionMap` computed property compares the most recent run against the average of previous runs and renders an exclamation-triangle icon on regressed metric badges (score metrics ≥10 point drop, time metrics ≥20% increase, CLS ≥0.1 increase).
+- **Alert thresholds** — inline panel via `useAlertConfigs`; shown when user is logged in and at least one run exists for the URL (provides `target_id`). Per-metric rows with comparison dropdown, threshold input, enabled toggle, save/delete. Inline notice when no schedule is active: "Alerts only fire for scheduled audits."
+
 ## New composables
 
 ### `useAuditHistory.js`
@@ -116,6 +121,18 @@ Shows an "Audit complete ✓" badge when a Lighthouse audit finishes. Encapsulat
 Used inside `useLighthouseAudit.js` — `showNotification()` is called in the `complete` SSE event handler. Returns `{ visible, show, dismiss }` which are re-exported from `useLighthouseAudit`.
 
 Badge rendered in `HomeView.vue` via `<Teleport to="body">`. The `dismiss()` function removes the `visibilitychange` listener and clears the timer.
+
+### `useAlertConfigs.js`
+
+CRUD composable for alert threshold configs. Calls `GET/POST /api/alerts` and `PATCH/DELETE /api/alerts/:id`. Used exclusively in `HistoryView.vue`.
+
+Returns: `{ configs, loading, error, fetchAlerts, createAlert, updateAlert, deleteAlert }`
+
+`fetchAlerts(targetId)` — pass a UUID target ID to scope results to one URL; omit for all user configs. Clears `configs` and returns early if `targetId` is falsy.
+
+### `useSound.js`
+
+Plays the "audit complete" pop sound via the Web Audio API. Used in `HomeView.vue` — `playOn()` is called when `progress` hits 100. No external audio file dependency; the sound is generated programmatically.
 
 ## Sub-directory docs
 

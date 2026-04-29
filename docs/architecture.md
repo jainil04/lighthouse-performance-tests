@@ -29,6 +29,7 @@ flowchart TD
         VFunc2["api/ai-summary.js\nServerless Function"]
         VFuncAuth["api/auth/*.js\nsignup / login / check-email"]
         VFuncHistory["api/history.js\nGET — auth required"]
+        VFuncAlerts["api/alerts.js\nGET/POST/PATCH/DELETE — auth required"]
     end
 
     subgraph Alternative ["Alternative Deploy"]
@@ -42,7 +43,7 @@ flowchart TD
     end
 
     OpenAI["OpenAI GPT-4.1\napi/ai-summary.js"]
-    NeonDB[("Neon Postgres\n@neondatabase/serverless\nusers · targets · runs\nmetrics · run_artifacts")]
+    NeonDB[("Neon Postgres\n@neondatabase/serverless\nusers · targets · runs\nmetrics · run_artifacts\nalert_configs · alert_events")]
     VFuncJobs["api/jobs.js\nPOST enqueue / GET list"]
     Redis[("Redis\nUpstash/Railway\nKV_URL — ioredis TCP\nBullMQ repeatable queue")]
     Worker["backend/workers/auditWorker.js\nBullMQ worker\n(persistent, Express process)"]
@@ -61,9 +62,11 @@ flowchart TD
     VFunc2 -->|"fetch"| OpenAI
     VFuncAuth -->|"users table"| NeonDB
     VFuncHistory -->|"runs + metrics JOIN"| NeonDB
+    VFuncAlerts -->|"alert_configs CRUD"| NeonDB
     VFuncJobs -->|"repeatable job\nrepeat:{pattern:schedule}"| Redis
     Redis -->|"auto-dequeue on cron"| Worker
     Worker -->|"persist run + metrics"| NeonDB
+    Worker -->|"checkAlerts()\nemail via Resend"| NeonDB
     Worker -.->|"Lighthouse via\nchrome-launcher"| Chrome
     Express -.->|"same audit logic\nchrome-launcher instead"| Chrome
 ```
@@ -203,6 +206,8 @@ Vercel deploys each file in `api/` as an isolated serverless function. Zero infr
 
 The Chrome binary problem is the interesting part. A real Chrome install is ~300MB. Serverless functions have tight bundle size limits. `@sparticuz/chromium` is a community-maintained stripped Chromium build (~80MB compressed) that runs in Lambda-style environments. `vercel.json` explicitly includes it in the function bundle alongside Lighthouse and its peer dependencies. Without this `includeFiles` config, the function would deploy without Chrome and fail on every invocation.
 
+**Route-to-file mapping** in `vercel.json` uses two rules. Most endpoints are covered by the catch-all `{ "src": "/api/(.*)", "dest": "/api/$1.js" }` — `/api/history` maps to `api/history.js`, etc. The catch-all is insufficient for endpoints with URL path parameters: `/api/alerts/some-uuid` would try to resolve `api/alerts/some-uuid.js`, which doesn't exist. Those endpoints need an explicit route entry *before* the catch-all — `api/alerts.js` uses `{ "src": "/api/alerts/([^/]+)", "dest": "/api/alerts.js" }` for its `PATCH`/`DELETE :id` operations. The upcoming sharing slice (`/api/r/:slug`) will follow the same convention.
+
 **`/backend/` — standalone Express**
 
 The Express server uses `chrome-launcher` to find whatever Chrome is already installed on the host. It runs as a persistent process on port 3001, has no timeout, and can (in principle) run BullMQ workers in the same process. It's the right choice for Railway, Render, or a VPS deploy.
@@ -230,6 +235,35 @@ Scheduled audits use BullMQ backed by Redis (`KV_URL`, ioredis TCP connection to
 3. On success, the run row in Postgres transitions from `pending` → `complete`. On failure, BullMQ retries with exponential backoff.
 
 The key constraint: the worker must run in the Express backend (a persistent process), not in Vercel serverless functions, which terminate after `res.end()`. This is why the dual-backend split exists — see [ADR 0001](decisions/0001-dual-deployment-vercel-serverless-and-express.md).
+
+### 5b. Alerts: threshold breach → email
+
+After `persistAuditRun()` succeeds, the worker calls `checkAlerts()` with the run's metrics.
+
+**`api/lib/checkAlerts.js`:**
+1. Loads all enabled, non-soft-deleted `alert_configs` for the target (`WHERE target_id = ? AND enabled = TRUE AND deleted_at IS NULL`).
+2. For each config, evaluates `metrics[metric] < threshold` (comparison = `below`) or `> threshold` (comparison = `above`).
+3. On breach, idempotency check against `alert_events (alert_config_id, run_id)`:
+   - Row exists + `email_sent_at IS NOT NULL` → skip (already delivered).
+   - Row exists + `email_sent_at IS NULL` → re-attempt send, update row.
+   - No row → INSERT first, then send, then UPDATE with `email_sent_at` or `email_error`.
+4. Email is sent via `api/lib/email.js` (Resend; dev-stub when `RESEND_API_KEY` is unset). See [ADR 0008](decisions/0008-email-provider-resend.md).
+5. Each config is wrapped in `try/catch` — one failed config does not abort the others.
+6. `checkAlerts()` errors are caught in the worker and logged; they never fail the BullMQ job. The audit result is already persisted; alert delivery is best-effort.
+
+**Alert data model:**
+- `alert_configs` — one row per (user, target, metric) combination. Soft-deleted (`deleted_at IS NULL` partial unique index prevents duplicate active configs for the same target+metric). See [ADR 0009](decisions/0009-alerts-scheduled-only.md).
+- `alert_events` — one row per (alert_config, run) pair; records `metric_value`, `email_sent_at`, and `email_error`.
+
+**Why scheduled audits only:** alerts surface regressions when nobody is watching. On-demand audits are foreground — the user is already looking at the result. See [ADR 0009](decisions/0009-alerts-scheduled-only.md).
+
+**API surface:**
+- `GET /api/alerts?target_id=...` — list configs (auth required)
+- `POST /api/alerts` — create config (auth required)
+- `PATCH /api/alerts/:id` — update threshold/comparison/enabled (auth required)
+- `DELETE /api/alerts/:id` — soft-delete (auth required)
+
+**Frontend:** alert config UI in `HistoryView.vue`, below the schedule section; gated on URL filter active + user logged in. Inline notice surfaces the "alerts only fire for scheduled audits" constraint when no schedule is set.
 
 ---
 
@@ -271,10 +305,13 @@ The one real tradeoff: SSE is unidirectional. If you wanted to cancel an in-prog
 
 **Phase 1 complete** (2026-04-27) — authentication, persistence, and history. Logged-in users can run audits, close the tab, return to `/history`, and see saved results. Guests can still audit without an account — results are ephemeral.
 
-**Phase 2 complete** (2026-04-28) — job queue infrastructure, trend visualization, scheduled audits UI, and regression detection are all live. Users configure Daily/Weekly/Monthly audit schedules per URL from `HistoryView.vue`; `POST /api/jobs` enqueues a BullMQ repeatable job that re-fires automatically on the cron pattern with no further intervention. `HistoryView.vue` computes `regressionMap` comparing the most recent run against the average of all previous runs for the filtered URL and renders an exclamation-triangle icon on regressed metric badges (thresholds: score metrics ≥10 point drop, time metrics ≥20% increase, CLS ≥0.1 increase).
+**Phase 2 complete** (2026-04-28) — job queue infrastructure, trend visualization, scheduled audits UI, and regression detection are all live.
+
+**Phase 3 notifications complete** (2026-04-28) — email alerts via Resend; `alert_configs` and `alert_events` tables; `checkAlerts()` wired into the BullMQ worker after each scheduled audit; CRUD API at `/api/alerts`; alert threshold UI in `HistoryView.vue`. See [ADR 0008](decisions/0008-email-provider-resend.md) and [ADR 0009](decisions/0009-alerts-scheduled-only.md).
 
 What remains unbuilt:
 
+- **Phase 3 sharing** — public shareable report URLs (`/r/<slug>`) and time-limited revocable share links. Planned as the next Phase 3 slice.
 - **Rate limiting** — no per-IP or per-user quotas. Guest audits are entirely open. Planned for Phase 4 via Redis token bucket.
 - **Audit cancellation** — no `DELETE /api/jobs/:id` or SSE close detection. An in-progress audit that the user navigates away from continues to completion server-side.
 - **Multi-tenancy / team workspaces** — all data is user-scoped; no team or organization sharing layer.
@@ -318,7 +355,7 @@ These were found during the architecture audit and do not yet match the code:
 
 1. ~~**`vercel.json` sets `LC_ALL=C`** in its `env` block, but `api/lighthouse.js` overwritten it at module load time.~~ **Fixed** — `LC_ALL` removed from `vercel.json`; code-level setter is the single source of truth.
 
-2. ~~**`/api/lighthouse/audit/stream` route in `vercel.json`** — legacy alias never called by the frontend.~~ **Fixed** — route removed; catch-all `"/api/(.*)"` handles all handlers.
+2. ~~**`/api/lighthouse/audit/stream` route in `vercel.json`** — legacy alias never called by the frontend.~~ **Fixed** — route removed. The routing rules are now: an explicit path-param route for `api/alerts.js` (`/api/alerts/([^/]+)`) followed by the catch-all `"/api/(.*)"`. See section 4 for the path-param pattern explanation.
 
 3. ~~**`import fs from 'fs'` in `api/lighthouse.js:3`** — unused import.~~ **Fixed** — import removed.
 

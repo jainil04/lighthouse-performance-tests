@@ -36,6 +36,7 @@
     "primeicons": "^7.0.0",
     "primevue": "^4.3.6",
     "puppeteer-core": "^21.6.1",
+    "resend": "^6.12.2",
     "robots-parser": "^3.0.1",
     "speedline-core": "^1.4.3",
     "tailwindcss": "^4.1.11",

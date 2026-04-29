@@ -55,7 +55,7 @@ These are architectural facts that must inform any new backend work. They are no
 - ✅ Removed `LC_ALL=C` from `vercel.json` (code-level setter is the single source of truth)
 - ✅ Removed dead `/audit/stream` legacy route from `vercel.json`
 - ✅ Removed unused `import fs from 'fs'` in `api/lighthouse.js`
-- ✅ Deleted dead serverless functions: `api/audit.js` (superseded by `lighthouse.js`), `api/health.js`, `api/status.js` — reduces deployed function count from 14 → 11, under Vercel Hobby plan's 12-function limit
+- ✅ Deleted dead serverless functions: `api/audit.js` (superseded by `lighthouse.js`), `api/health.js`, `api/status.js` — reduces deployed function count from 14 → 11, under Vercel Hobby plan's 12-function limit (currently 8 after Phase 3 added `api/alerts.js`)
 
 **Definition of done:** ✅ Phase 0 is complete. All docs are written, inconsistencies are resolved, and the codebase matches its documentation.
 
@@ -74,7 +74,7 @@ These are architectural facts that must inform any new backend work. They are no
 - ✅ `POST /api/auth/signup` — email + password; bcrypt hashing (cost 10); returns JWT (7-day access token)
 - ✅ `POST /api/auth/login` — verifies credentials; returns JWT (7-day access token; no refresh token — deferred)
 - ✅ `GET /api/auth/check-email` — returns `{exists: boolean}`; used by the three-step auth UI to determine login vs. signup flow
-- ✅ JWT middleware (`api/lib/auth.js` → `verifyToken()`) — validates `Authorization: Bearer <token>`; used in `api/lighthouse.js` (optional) and `api/history.js` (required). *Note: `/backend/` Express does not have JWT middleware — parity gap accepted while Express is not the primary deployment.*
+- ✅ JWT middleware (`api/lib/auth.js` → `verifyToken()`) — validates `Authorization: Bearer <token>`; used in `api/lighthouse.js` (optional) and `api/history.js` (required). `backend/server.js` also applies `requireAuth` to `/api/lighthouse` (parity gap is closed; auth middleware is shared from `api/lib/auth.js`).
 - ✅ `POST /api/lighthouse` — wired to persist each run to `runs` + `metrics` tables for authenticated users; guests run normally with no persistence (see [ADR 0007](decisions/0007-auth-optional.md))
 - ✅ `GET /api/history` — paginated audit history for the authenticated user, filterable by URL; returns scores + Core Web Vitals per run
 
@@ -121,8 +121,8 @@ These are architectural facts that must inform any new backend work. They are no
 *Purpose: make the tool useful when the user isn't watching, and shareable when they want to show results to a colleague or client.*
 
 **Notifications**
-- 📋 Email alerts when a user-defined score threshold is breached (Resend or Postmark — transactional email, not marketing)
-- 📋 Alert config per target URL: user sets threshold per category (e.g., "alert me if Performance drops below 70")
+- ✅ Email alerts when a user-defined score threshold is breached — Resend transactional email; fires on scheduled audits only (2026-04-28, see [ADR 0008](decisions/0008-email-provider-resend.md) and [ADR 0009](decisions/0009-alerts-scheduled-only.md))
+- ✅ Alert config per target URL: user sets threshold + comparison per metric (e.g., "alert me if Performance drops below 70"); `alert_configs` + `alert_events` tables; `checkAlerts()` in `api/lib/`; UI in `HistoryView.vue` (2026-04-28)
 
 **Sharing**
 - 📋 Public shareable report URLs at `/r/<slug>` — read-only, no auth required
